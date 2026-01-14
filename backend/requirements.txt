@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+oracledb
+pydantic
+pydantic-settings
+python-multipart
+# Add any others as needed

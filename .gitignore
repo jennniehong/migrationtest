@@ -1,0 +1,30 @@
+# General
+.DS_Store
+.vscode/
+.idea/
+*.log
+
+# Backend (Python)
+backend/__pycache__/
+backend/*.pyc
+backend/venv/
+backend/.venv/
+backend/env/
+backend/.env
+
+# Backend Workspace (Job Data)
+backend/work/
+
+# Frontend (Node.js/React)
+frontend-app/node_modules/
+frontend-app/dist/
+frontend-app/.env.local
+frontend-app/.env.development.local
+frontend-app/.env.test.local
+frontend-app/.env.production.local
+frontend-app/npm-debug.log*
+frontend-app/yarn-debug.log*
+frontend-app/yarn-error.log*
+
+# Infra
+infra/.env
