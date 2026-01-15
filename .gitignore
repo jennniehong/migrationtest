@@ -16,7 +16,7 @@ backend/.env
 backend/work/
 
 # Frontend (Node.js/React)
-frontend-app/node_modules/
+node_modules/
 frontend-app/dist/
 frontend-app/.env.local
 frontend-app/.env.development.local

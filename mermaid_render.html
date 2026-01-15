@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+    <style>
+        body { margin: 0; padding: 20px; background: white; font-family: sans-serif; }
+        .mermaid { display: inline-block; }
+    </style>
+</head>
+<body>
+    <div id="diagram" class="mermaid">
+graph TD
+    User[웹 브라우저] <-->|HTTP/JSON| Frontend[React App]
+    Frontend <-->|REST API| Backend[FastAPI 서버]
+    
+    subgraph "Backend Services"
+        Backend -->|Query Metadata| OracleService[Oracle 서비스]
+        Backend -->|Dispatch| JobMgr[작업 관리자 (In-Memory)]
+        JobMgr -->|Spawn| Runner[Docker 러너]
+    end
+    
+    subgraph "Infrastructure"
+        Runner -->|Docker Run| Container[Ora2Pg 컨테이너]
+        Container -->|Read/Write| SharedVol[공유 작업 볼륨]
+    end
+    
+    subgraph "External Data"
+        OracleService -->|SQL*Net| OracleDB[(Oracle 데이터베이스)]
+        Container -->|SQL*Net| OracleDB
+    end
+    </div>
+</body>
+</html>
