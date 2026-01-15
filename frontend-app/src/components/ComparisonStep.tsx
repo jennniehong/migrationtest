@@ -68,21 +68,11 @@ export function ComparisonStep({ connInfo, selectedObjects, onContinue, onBack }
 
   return (
     <div className="step-container">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h3 className="text-xl font-bold m-0">DDL Comparison</h3>
-          <p className="text-sm text-muted mt-1">
-            Compare Oracle source DDL with converted PostgreSQL DDL
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <button className="btn-secondary" onClick={onBack}>
-            ← Back to Selection
-          </button>
-          <button className="btn-primary" onClick={onContinue}>
-            Continue to Migration →
-          </button>
-        </div>
+      <div className="mb-6">
+        <h3 className="text-xl font-bold m-0">DDL Comparison</h3>
+        <p className="text-sm text-muted mt-1">
+          Compare Oracle source DDL with converted PostgreSQL DDL
+        </p>
       </div>
 
       {/* Object Selector */}
@@ -137,6 +127,16 @@ export function ComparisonStep({ connInfo, selectedObjects, onContinue, onBack }
           </div>
         </div>
       )}
+
+      {/* Navigation Footer */}
+      <div className="flex justify-between items-center gap-4 mt-6">
+        <button className="btn-secondary" onClick={onBack}>
+          ← Back to Selection
+        </button>
+        <button className="btn-primary" onClick={onContinue}>
+          Start Migration →
+        </button>
+      </div>
     </div>
   );
 }

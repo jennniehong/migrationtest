@@ -14,6 +14,7 @@ interface SelectionStepProps {
   filteredObjects: OracleObject[];
   loading: boolean;
   onStartJob: () => void;
+  onBack: () => void;
 }
 
 export const SelectionStep: React.FC<SelectionStepProps> = ({
@@ -28,7 +29,8 @@ export const SelectionStep: React.FC<SelectionStepProps> = ({
   uniqueTypes,
   filteredObjects,
   loading,
-  onStartJob
+  onStartJob,
+  onBack
 }) => {
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
 
@@ -182,13 +184,18 @@ export const SelectionStep: React.FC<SelectionStepProps> = ({
         </table>
       </div>
 
-      <div className="selection-footer">
-        <span className="flex items-center text-sm text-muted">
-          {selectedObjects.length === 0 ? 'Select objects to proceed' : 'Ready to migrate'}
-        </span>
-        <button className="btn-primary" onClick={onStartJob} disabled={loading || selectedObjects.length === 0}>
-          {loading ? 'Starting...' : 'Start Conversion'}
+      <div className="flex justify-between items-center gap-4 mt-4 pt-4 border-t border-border">
+        <button className="btn-secondary" onClick={onBack}>
+          ← Back to Connection
         </button>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted">
+            {selectedObjects.length === 0 ? 'Select objects to proceed' : `${selectedObjects.length} object(s) ready`}
+          </span>
+          <button className="btn-primary" onClick={onStartJob} disabled={loading || selectedObjects.length === 0}>
+            {loading ? 'Starting...' : 'Continue to Comparison →'}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -16,6 +16,7 @@ interface MonitorStepProps {
   selectedObjects: OracleObject[];
   connInfo: ConnectionInfo;
   onNewSession: () => void;
+  onBackToComparison: () => void;
   onDataMigration?: () => void;
 }
 
@@ -29,6 +30,7 @@ export const MonitorStep: React.FC<MonitorStepProps> = ({
   selectedObjects,
   connInfo,
   onNewSession,
+  onBackToComparison,
   onDataMigration
 }) => {
   const logContainerRef = useRef<HTMLDivElement>(null);
@@ -159,21 +161,32 @@ export const MonitorStep: React.FC<MonitorStepProps> = ({
         </div>
       )}
 
-      <div className="flex gap-4 mt-8">
+      <div className="flex justify-between items-center gap-4 mt-8">
+        <div className="flex gap-3">
+          <button className="btn-secondary" onClick={onBackToComparison}>
+            ← Back to Comparison
+          </button>
+          <button className="btn-secondary" onClick={onNewSession}>
+            New Session
+          </button>
+        </div>
+        <div className="flex gap-3">
           {jobStatus?.status === 'DONE' && (
-            <a 
-            href={`${API_BASE}/jobs/${jobId}/download`}
-            className="btn-primary download-btn"
-            >
-            Download Migration Report (ZIP)
-            </a>
+            <>
+              <a 
+                href={`${API_BASE}/jobs/${jobId}/download`}
+                className="btn-primary download-btn"
+              >
+                📥 Download Results (ZIP)
+              </a>
+              {onDataMigration && (
+                <button className="btn-primary" onClick={onDataMigration}>
+                  Migrate Data →
+                </button>
+              )}
+            </>
           )}
-          {jobStatus?.status === 'DONE' && onDataMigration && (
-            <button className="btn-primary" onClick={onDataMigration}>
-              Migrate Data →
-            </button>
-          )}
-          <button className="btn-secondary" onClick={onNewSession}>New Session</button>
+        </div>
       </div>
     </div>
   );

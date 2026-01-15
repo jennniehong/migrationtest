@@ -14,6 +14,14 @@ const API_BASE = "http://localhost:8080/api";
 function AppContent() {
   const { showToast } = useToast();
   
+  // Session-specific state storage
+  const [sessionStates, setSessionStates] = useState<Map<string, {
+    connInfo: ConnectionInfo;
+    objects: OracleObject[];
+    selectedObjects: OracleObject[];
+    schemas: string[];
+  }>>(new Map());
+
   const [connInfo, setConnInfo] = useState<ConnectionInfo>({
     host: '',
     port: 1521,
@@ -158,10 +166,31 @@ function AppContent() {
   };
 
   const handleSelectJob = (id: string) => {
+    // Save current session state before switching (if we have a jobId)
+    if (jobId && (connInfo.host || objects.length > 0)) {
+      setSessionStates(prev => new Map(prev).set(jobId, {
+        connInfo,
+        objects,
+        selectedObjects,
+        schemas
+      }));
+    }
+
+    // Load target session state if it exists
+    const targetSessionState = sessionStates.get(id);
+    if (targetSessionState) {
+      setConnInfo(targetSessionState.connInfo);
+      setObjects(targetSessionState.objects);
+      setSelectedObjects(targetSessionState.selectedObjects);
+      setSchemas(targetSessionState.schemas);
+    } else {
+      // If no saved state, reset to defaults (will be populated from API)
+      setSelectedObjects([]);
+    }
+
     setJobId(id);
     setJobStatus(null);
     setLogs([]);
-    setSelectedObjects([]); 
     setActiveTab('monitor');
     setActiveTabMonitor('overview');
     fetchJobDetails(id);
@@ -198,12 +227,25 @@ function AppContent() {
   };
 
   const handleNewSession = () => {
+    // Save current session state before starting new one (if we have a jobId)
+    if (jobId && (connInfo.host || objects.length > 0)) {
+      setSessionStates(prev => new Map(prev).set(jobId, {
+        connInfo,
+        objects,
+        selectedObjects,
+        schemas
+      }));
+    }
+
+    // Complete reset for a brand new migration session
     setJobId(null);
     setJobStatus(null);
     setLogs([]);
     setObjects([]);
     setSelectedObjects([]);
     setActiveTab('connect');
+    setSchemas([]);
+    // Reset connection info to start fresh
     setConnInfo({
       host: '',
       port: 1521,
@@ -360,7 +402,78 @@ function AppContent() {
           </div>
         </header>
 
-        {activeTab === 'connect' && !jobId && (
+        {/* Workflow Tabs - Show progression throughout entire workflow */}
+        <div className="tabs-nav">
+          {!jobId ? (
+            <>
+              <button 
+                className={`tab-btn ${activeTab === 'connect' ? 'active' : ''}`}
+                onClick={() => setActiveTab('connect')}
+              >
+                1. Connection
+              </button>
+              <button 
+                className={`tab-btn ${activeTab === 'select' ? 'active' : ''}`}
+                onClick={() => setActiveTab('select')}
+                disabled={objects.length === 0}
+                style={{ opacity: objects.length === 0 ? 0.5 : 1, cursor: objects.length === 0 ? 'not-allowed' : 'pointer' }}
+              >
+                2. Selection
+              </button>
+              <button 
+                className={`tab-btn ${activeTab === 'compare' ? 'active' : ''}`}
+                onClick={() => setActiveTab('compare')}
+                disabled={selectedObjects.length === 0}
+                style={{ opacity: selectedObjects.length === 0 ? 0.5 : 1, cursor: selectedObjects.length === 0 ? 'not-allowed' : 'pointer' }}
+              >
+                3. Comparison
+              </button>
+              <button 
+                className="tab-btn"
+                disabled={true}
+                style={{ opacity: 0.5, cursor: 'not-allowed' }}
+              >
+                4. Monitor
+              </button>
+            </>
+          ) : (
+            <>
+              <button 
+                className={`tab-btn ${activeTab === 'connect' ? 'active' : ''}`}
+                onClick={() => setActiveTab('connect')}
+                style={{ opacity: 0.8 }}
+                title="View connection details"
+              >
+                ✓ Connection
+              </button>
+              <button 
+                className={`tab-btn ${activeTab === 'select' ? 'active' : ''}`}
+                onClick={() => setActiveTab('select')}
+                style={{ opacity: 0.8 }}
+                title="View selected objects"
+              >
+                ✓ Selection
+              </button>
+              <button 
+                className={`tab-btn ${activeTab === 'compare' ? 'active' : ''}`}
+                onClick={() => setActiveTab('compare')}
+                disabled={selectedObjects.length === 0}
+                style={{ opacity: selectedObjects.length === 0 ? 0.5 : 0.8, cursor: selectedObjects.length === 0 ? 'not-allowed' : 'pointer' }}
+                title="View DDL comparison"
+              >
+                ✓ Comparison
+              </button>
+              <button 
+                className={`tab-btn ${activeTab === 'monitor' ? 'active' : ''}`}
+                onClick={() => setActiveTab('monitor')}
+              >
+                4. Monitor
+              </button>
+            </>
+          )}
+        </div>
+
+        {activeTab === 'connect' && (
           <ConnectionStep 
             connInfo={connInfo}
             setConnInfo={setConnInfo}
@@ -385,6 +498,7 @@ function AppContent() {
             filteredObjects={filteredObjects}
             loading={loading}
             onStartJob={() => setActiveTab('compare')}
+            onBack={() => setActiveTab('connect')}
           />
         )}
 
@@ -416,6 +530,7 @@ function AppContent() {
             selectedObjects={selectedObjects}
             connInfo={connInfo}
             onNewSession={handleNewSession}
+            onBackToComparison={() => setActiveTab('compare')}
             onDataMigration={() => setActiveTab('data')}
           />
         )}
