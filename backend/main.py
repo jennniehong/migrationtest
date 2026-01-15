@@ -272,6 +272,9 @@ async def convert_ddl(request: DDLRequest, background_tasks: BackgroundTasks):
         job_dir = os.path.join(WORK_DIR, job_id)
         os.makedirs(job_dir, exist_ok=True)
         
+        print(f"[DDL Conversion] Starting conversion for {request.object_type}: {request.object_name}")
+        print(f"[DDL Conversion] Working directory: {job_dir}")
+        
         # Create a minimal ora2pg.conf for single object
         config_path = os.path.join(job_dir, "ora2pg.conf")
         with open(config_path, "w") as f:
@@ -283,7 +286,9 @@ async def convert_ddl(request: DDLRequest, background_tasks: BackgroundTasks):
             f.write(f"TYPE {request.object_type}\n")
             f.write(f"ALLOW {request.object_name}\n")
             f.write(f"OUTPUT {job_id}_converted.sql\n")
-            f.write(f"OUTPUT_DIR {job_dir}\n")
+            f.write(f"OUTPUT_DIR /data\n")  # Docker internal path
+        
+        print(f"[DDL Conversion] ora2pg.conf created")
         
         # Run ora2pg in Docker
         import subprocess
@@ -294,17 +299,26 @@ async def convert_ddl(request: DDLRequest, background_tasks: BackgroundTasks):
             "ora2pg", "-c", "/data/ora2pg.conf"
         ]
         
+        print(f"[DDL Conversion] Running Docker command: {' '.join(cmd)}")
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        
+        print(f"[DDL Conversion] Docker exit code: {result.returncode}")
+        if result.stdout:
+            print(f"[DDL Conversion] Docker stdout: {result.stdout}")
+        if result.stderr:
+            print(f"[DDL Conversion] Docker stderr: {result.stderr}")
         
         # Read converted DDL
         output_file = os.path.join(job_dir, f"{job_id}_converted.sql")
         converted_ddl = ""
-        if os.path.exists(output_file):
-            with open(output_file, "r") as f:
-                converted_ddl = f.read()
         
-        # Cleanup
-        shutil.rmtree(job_dir, ignore_errors=True)
+        if os.path.exists(output_file):
+            with open(output_file, "r", encoding='utf-8') as f:
+                converted_ddl = f.read()
+            print(f"[DDL Conversion] Converted DDL file found, size: {len(converted_ddl)} bytes")
+        else:
+            print(f"[DDL Conversion] Output file not found: {output_file}")
+            print(f"[DDL Conversion] Files in job_dir: {os.listdir(job_dir)}")
         
         # Also fetch source DDL for comparison
         source_ddl = OracleService.get_ddl(
@@ -313,13 +327,31 @@ async def convert_ddl(request: DDLRequest, background_tasks: BackgroundTasks):
             request.object_name
         )
         
+        # Prepare error message if conversion failed
+        if not converted_ddl:
+            error_msg = "Conversion failed or produced no output."
+            if result.returncode != 0:
+                error_msg += f"\nDocker exit code: {result.returncode}"
+            if result.stderr:
+                error_msg += f"\nError: {result.stderr[:500]}"  # First 500 chars
+            converted_ddl = error_msg
+        
+        # Cleanup
+        shutil.rmtree(job_dir, ignore_errors=True)
+        
         return DDLComparison(
             object_name=request.object_name,
             object_type=request.object_type,
             source_ddl=source_ddl,
-            converted_ddl=converted_ddl if converted_ddl else "Conversion failed or produced no output"
+            converted_ddl=converted_ddl
         )
+    except subprocess.TimeoutExpired:
+        print(f"[DDL Conversion] Docker command timed out after 30 seconds")
+        raise HTTPException(status_code=500, detail="DDL conversion timed out after 30 seconds")
     except Exception as e:
+        print(f"[DDL Conversion] Exception: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"DDL conversion failed: {str(e)}")
 
 # ==========================================
