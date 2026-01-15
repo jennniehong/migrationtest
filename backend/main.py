@@ -110,21 +110,15 @@ async def create_job(request: JobCreateRequest, background_tasks: BackgroundTask
     """
     job_id = str(uuid.uuid4())
     
-    # Initialize job state
+    # Initialize job state in memory (fast)
     job = JobProgress(
         job_id=job_id,
-        status=JobStatus.CREATED,
+        status=JobStatus.RUNNING,  # Set to RUNNING immediately
         created_at=datetime.datetime.now(),
         selected_objects=request.objects
     )
     jobs[job_id] = job
     job_logs[job_id] = [f"[{datetime.datetime.now()}] Job created."]
-    
-    # Create work directory structure
-    job_dir = os.path.join(WORK_DIR, job_id)
-    os.makedirs(os.path.join(job_dir, "logs"), exist_ok=True)
-    os.makedirs(os.path.join(job_dir, "out"), exist_ok=True)
-    os.makedirs(os.path.join(job_dir, "tmp"), exist_ok=True)
     
     # Callback to capture logs from the runner
     def on_log(msg: str):
@@ -146,10 +140,10 @@ async def create_job(request: JobCreateRequest, background_tasks: BackgroundTask
         jobs[job_id].finished_at = datetime.datetime.now()
         jobs[job_id].message = message
 
-    # Start the runner in the background
-    jobs[job_id].status = JobStatus.RUNNING
+    # Start the runner in the background (directory creation happens there)
     background_tasks.add_task(runner.run, job_id, request, on_log, on_complete)
     
+    # Return immediately without waiting for filesystem operations
     return {"jobId": job_id}
 
 @app.get("/api/jobs", response_model=List[JobProgress])

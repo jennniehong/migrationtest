@@ -92,9 +92,11 @@ class DockerRunner(BaseRunner):
         try:
             on_log(f"Preparing for job {job_id}...")
             
-            # --- SIMULATION DELAY ---
-            on_log("Simulating long running job... waiting 60 seconds.")
-            time.sleep(60)
+            # Create work directory structure (moved from main.py)
+            os.makedirs(os.path.join(job_dir, "logs"), exist_ok=True)
+            os.makedirs(os.path.join(job_dir, "out"), exist_ok=True)
+            os.makedirs(os.path.join(job_dir, "tmp"), exist_ok=True)
+            on_log("Work directories created.")
             
             conn = request.connection
             
