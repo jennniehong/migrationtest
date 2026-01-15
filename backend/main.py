@@ -10,7 +10,8 @@ import zipfile
 
 from models import (
     OracleConnInfo, JobCreateRequest, JobProgress, 
-    JobStatus, OracleObject, LogEntry
+    JobStatus, OracleObject, LogEntry,
+    DDLRequest, DDLComparison, DataMigrationRequest
 )
 from oracle_service import OracleService
 from runner import DockerRunner
@@ -230,6 +231,156 @@ async def cancel_job(jobId: str):
     jobs[jobId].status = JobStatus.CANCELED
     job_logs[jobId].append(f"[{datetime.datetime.now()}] Job canceled by user.")
     return {"status": "canceled"}
+
+# ==========================================
+# API Endpoints: DDL Comparison
+# ==========================================
+
+@app.post("/api/oracle/ddl", response_model=DDLComparison, response_model_by_alias=True)
+async def get_ddl(request: DDLRequest):
+    """
+    Fetch the Oracle DDL for a specific object.
+    
+    특정 객체에 대한 오라클 DDL을 가져옵니다.
+    """
+    try:
+        source_ddl = OracleService.get_ddl(
+            request.connection, 
+            request.object_type, 
+            request.object_name
+        )
+        return DDLComparison(
+            object_name=request.object_name,
+            object_type=request.object_type,
+            source_ddl=source_ddl
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/convert/ddl", response_model=DDLComparison, response_model_by_alias=True)
+async def convert_ddl(request: DDLRequest, background_tasks: BackgroundTasks):
+    """
+    Convert Oracle DDL to PostgreSQL using ora2pg.
+    Runs a quick conversion for a single object.
+    
+    ora2pg를 사용하여 오라클 DDL을 PostgreSQL로 변환합니다.
+    단일 객체에 대한 빠른 변환을 실행합니다.
+    """
+    try:
+        # Create temporary job for DDL conversion
+        job_id = f"ddl_{uuid.uuid4()}"
+        job_dir = os.path.join(WORK_DIR, job_id)
+        os.makedirs(job_dir, exist_ok=True)
+        
+        # Create a minimal ora2pg.conf for single object
+        config_path = os.path.join(job_dir, "ora2pg.conf")
+        with open(config_path, "w") as f:
+            dsn = f"dbi:Oracle:host={request.connection.host};sid={request.connection.sid or ''};service_name={request.connection.service_name or ''};port={request.connection.port}"
+            f.write(f"ORACLE_DSN {dsn}\n")
+            f.write(f"ORACLE_USER {request.connection.user}\n")
+            f.write(f"ORACLE_PWD {request.connection.password}\n")
+            f.write(f"SCHEMA {request.connection.schema_name}\n")
+            f.write(f"TYPE {request.object_type}\n")
+            f.write(f"ALLOW {request.object_name}\n")
+            f.write(f"OUTPUT {job_id}_converted.sql\n")
+            f.write(f"OUTPUT_DIR {job_dir}\n")
+        
+        # Run ora2pg in Docker
+        import subprocess
+        cmd = [
+            "docker", "run", "--rm",
+            "-v", f"{os.path.abspath(job_dir)}:/data",
+            "ora2pg-runner",
+            "ora2pg", "-c", "/data/ora2pg.conf"
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        
+        # Read converted DDL
+        output_file = os.path.join(job_dir, f"{job_id}_converted.sql")
+        converted_ddl = ""
+        if os.path.exists(output_file):
+            with open(output_file, "r") as f:
+                converted_ddl = f.read()
+        
+        # Cleanup
+        shutil.rmtree(job_dir, ignore_errors=True)
+        
+        # Also fetch source DDL for comparison
+        source_ddl = OracleService.get_ddl(
+            request.connection,
+            request.object_type,
+            request.object_name
+        )
+        
+        return DDLComparison(
+            object_name=request.object_name,
+            object_type=request.object_type,
+            source_ddl=source_ddl,
+            converted_ddl=converted_ddl if converted_ddl else "Conversion failed or produced no output"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"DDL conversion failed: {str(e)}")
+
+# ==========================================
+# API Endpoints: Data Migration
+# ==========================================
+
+@app.post("/api/jobs/data-migration")
+async def create_data_migration_job(request: DataMigrationRequest, background_tasks: BackgroundTasks):
+    """
+    Create a data migration job for selected tables.
+    Similar to regular migration but uses DATA export type.
+    
+    선택한 테이블에 대한 데이터 마이그레이션 작업을 생성합니다.
+    일반 마이그레이션과 유사하지만 DATA 내보내기 유형을 사용합니다.
+    """
+    job_id = str(uuid.uuid4())
+    
+    # Initialize job state
+    job = JobProgress(
+        job_id=job_id,
+        status=JobStatus.CREATED,
+        created_at=datetime.datetime.now(),
+        selected_objects=None  # Tables are in request.tables
+    )
+    jobs[job_id] = job
+    job_logs[job_id] = [f"[{datetime.datetime.now()}] Data migration job created for {len(request.tables)} tables."]
+    
+    # Create work directory
+    job_dir = os.path.join(WORK_DIR, job_id)
+    os.makedirs(os.path.join(job_dir, "logs"), exist_ok=True)
+    os.makedirs(os.path.join(job_dir, "out"), exist_ok=True)
+    
+    def on_log(msg: str):
+        job_logs[job_id].append(f"[{datetime.datetime.now()}] {msg}")
+    
+    def on_complete(status: JobStatus, message: str):
+        jobs[job_id].status = status
+        jobs[job_id].finished_at = datetime.datetime.now()
+        jobs[job_id].message = message
+    
+    # Start data migration in background
+    jobs[job_id].status = JobStatus.RUNNING
+    
+    # Convert table names to OracleObject format for runner
+    table_objects = [OracleObject(name=t, type="TABLE") for t in request.tables]
+    
+    # Create a modified request that focuses on DATA export
+    migration_request = JobCreateRequest(
+        connection=request.connection,
+        objects=table_objects,
+        outputFormat="COPY"  # Use COPY for data migration
+    )
+    
+    background_tasks.add_task(runner.run, job_id, migration_request, on_log, on_complete)
+    
+    return {"jobId": job_id}
+
+# ==========================================
+# API Endpoints: Downloads
+# ==========================================
+
 
 @app.get("/api/jobs/{jobId}/download")
 async def download_result(jobId: str):

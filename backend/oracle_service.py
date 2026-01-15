@@ -168,3 +168,42 @@ class OracleService:
         except Exception as e:
             raise Exception(f"Failed to fetch Oracle schemas: {str(e)}")
         return schemas
+
+    @classmethod
+    def get_ddl(cls, info: OracleConnInfo, object_type: str, object_name: str) -> str:
+        """
+        Extracts DDL (Data Definition Language) for a specific Oracle object using DBMS_METADATA.
+        
+        DBMS_METADATA를 사용하여 특정 오라클 객체에 대한 DDL(데이터 정의 언어)을 추출합니다.
+        """
+        cls.initialize_client(info)
+        dsn = cls.get_connection_string(info)
+        schema = info.schema_name.upper()
+        
+        try:
+            with oracledb.connect(user=info.user, password=info.password, dsn=dsn) as conn:
+                with conn.cursor() as cursor:
+                    # Set DBMS_METADATA preferences for cleaner DDL output
+                    cursor.execute("BEGIN DBMS_METADATA.SET_TRANSFORM_PARAM(DBMS_METADATA.SESSION_TRANSFORM,'STORAGE',false); END;")
+                    cursor.execute("BEGIN DBMS_METADATA.SET_TRANSFORM_PARAM(DBMS_METADATA.SESSION_TRANSFORM,'TABLESPACE',false); END;")
+                    cursor.execute("BEGIN DBMS_METADATA.SET_TRANSFORM_PARAM(DBMS_METADATA.SESSION_TRANSFORM,'SEGMENT_ATTRIBUTES',false); END;")
+                    
+                    # Fetch DDL
+                    ddl_query = """
+                        SELECT DBMS_METADATA.GET_DDL(:object_type, :object_name, :schema_name) 
+                        FROM DUAL
+                    """
+                    cursor.execute(ddl_query, 
+                                   object_type=object_type.upper(), 
+                                   object_name=object_name.upper(), 
+                                   schema_name=schema)
+                    result = cursor.fetchone()
+                    
+                    if result and result[0]:
+                        # Convert CLOB to string if necessary
+                        ddl = result[0].read() if hasattr(result[0], 'read') else str(result[0])
+                        return ddl
+                    else:
+                        raise Exception(f"No DDL found for {object_type} {object_name}")
+        except Exception as e:
+            raise Exception(f"Failed to fetch DDL for {object_type} {object_name}: {str(e)}")

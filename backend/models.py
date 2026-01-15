@@ -94,3 +94,48 @@ class LogEntry(BaseModel):
     timestamp: datetime.datetime
     level: str
     message: str
+
+# ==========================================
+# DDL Comparison Models
+# ==========================================
+
+class DDLRequest(BaseModel):
+    """
+    Request model for fetching DDL of a specific object.
+    
+    특정 객체의 DDL을 가져오기 위한 요청 모델입니다.
+    """
+    connection: OracleConnInfo
+    object_name: str = Field(..., alias="objectName")
+    object_type: str = Field(..., alias="objectType")
+    
+    class Config:
+        populate_by_name = True
+
+class DDLComparison(BaseModel):
+    """
+    Response model for DDL comparison view.
+    
+    DDL 비교 뷰를 위한 응답 모델입니다.
+    """
+    object_name: str = Field(..., alias="objectName")
+    object_type: str = Field(..., alias="objectType")
+    source_ddl: str = Field(..., alias="sourceDDL")  # Oracle DDL
+    converted_ddl: Optional[str] = Field(None, alias="convertedDDL")  # PostgreSQL DDL
+    
+    class Config:
+        populate_by_name = True
+
+# ==========================================
+# Data Migration Models
+# ==========================================
+
+class DataMigrationRequest(BaseModel):
+    """
+    Request model for initiating data migration.
+    
+    데이터 마이그레이션 시작을 위한 요청 모델입니다.
+    """
+    connection: OracleConnInfo
+    tables: List[str]  # List of table names to migrate data
+    batch_size: int = 1000  # Number of rows per batch

@@ -1,0 +1,142 @@
+import React, { useState } from 'react';
+import { ConnectionInfo, OracleObject } from '../types';
+
+const API_BASE = "http://localhost:8080/api";
+
+interface ComparisonStepProps {
+  connInfo: ConnectionInfo;
+  selectedObjects: OracleObject[];
+  onContinue: () => void;
+  onBack: () => void;
+}
+
+interface DDLComparison {
+  objectName: string;
+  objectType: string;
+  sourceDDL: string;
+  convertedDDL: string | null;
+}
+
+export function ComparisonStep({ connInfo, selectedObjects, onContinue, onBack }: ComparisonStepProps) {
+  const [selectedObjectIndex, setSelectedObjectIndex] = useState(0);
+  const [comparison, setComparison] = useState<DDLComparison | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const currentObject = selectedObjects[selectedObjectIndex];
+
+  const fetchComparison = async () => {
+    if (!currentObject) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(`${API_BASE}/convert/ddl`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          connection: connInfo,
+          object_name: currentObject.name,
+          object_type: currentObject.type
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch DDL comparison');
+      }
+
+      const data = await response.json();
+      setComparison(data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load comparison');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleObjectChange = (index: number) => {
+    setSelectedObjectIndex(index);
+    setComparison(null);
+  };
+
+  React.useEffect(() => {
+    if (currentObject) {
+      fetchComparison();
+    }
+  }, [selectedObjectIndex]);
+
+  return (
+    <div className="step-container">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h3 className="text-xl font-bold m-0">DDL Comparison</h3>
+          <p className="text-sm text-muted mt-1">
+            Compare Oracle source DDL with converted PostgreSQL DDL
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <button className="btn-secondary" onClick={onBack}>
+            ← Back to Selection
+          </button>
+          <button className="btn-primary" onClick={onContinue}>
+            Continue to Migration →
+          </button>
+        </div>
+      </div>
+
+      {/* Object Selector */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium mb-2">Select Object:</label>
+        <select 
+          className="input-field"
+          value={selectedObjectIndex}
+          onChange={(e) => handleObjectChange(parseInt(e.target.value))}
+          style={{ width: '400px' }}
+        >
+          {selectedObjects.map((obj, index) => (
+            <option key={index} value={index}>
+              {obj.type}: {obj.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* DDL Comparison Panels */}
+      {loading && (
+        <div className="text-center p-8">
+          <div className="step-circle active loading-spinner">↻</div>
+          <p className="mt-4">Loading DDL comparison...</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-300 rounded" style={{ color: '#c53030' }}>
+          <strong>Error:</strong> {error}
+        </div>
+      )}
+
+      {!loading && !error && comparison && (
+        <div className="ddl-comparison-container">
+          <div className="ddl-panel">
+            <div className="ddl-panel-header">
+              <h4>Oracle Source DDL</h4>
+              <span className="text-muted text-sm">{comparison.objectType}</span>
+            </div>
+            <pre className="ddl-content">{comparison.sourceDDL}</pre>
+          </div>
+
+          <div className="ddl-panel">
+            <div className="ddl-panel-header">
+              <h4>PostgreSQL Converted DDL</h4>
+              <span className="text-muted text-sm">Converted by ora2pg</span>
+            </div>
+            <pre className="ddl-content">
+              {comparison.convertedDDL || 'No conversion available'}
+            </pre>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

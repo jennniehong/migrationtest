@@ -4,7 +4,7 @@ import { ConnectionInfo, JobProgress, OracleObject } from '../types';
 // Assuming API_BASE is shared constant, but components shouldn't rely on it for download link if possible.
 // We'll accept download URL generation or base as prop, or keep hardcoded if it was constant. 
 // Ideally passed as prop, but 'API_BASE' was a constant in App.tsx. We'll reuse the string literal for simplicity or move it to constants.
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = "http://localhost:8080/api";
 
 interface MonitorStepProps {
   jobId: string;
@@ -16,6 +16,7 @@ interface MonitorStepProps {
   selectedObjects: OracleObject[];
   connInfo: ConnectionInfo;
   onNewSession: () => void;
+  onDataMigration?: () => void;
 }
 
 export const MonitorStep: React.FC<MonitorStepProps> = ({
@@ -27,7 +28,8 @@ export const MonitorStep: React.FC<MonitorStepProps> = ({
   setActiveTabMonitor,
   selectedObjects,
   connInfo,
-  onNewSession
+  onNewSession,
+  onDataMigration
 }) => {
   const logContainerRef = useRef<HTMLDivElement>(null);
 
@@ -165,6 +167,11 @@ export const MonitorStep: React.FC<MonitorStepProps> = ({
             >
             Download Migration Report (ZIP)
             </a>
+          )}
+          {jobStatus?.status === 'DONE' && onDataMigration && (
+            <button className="btn-primary" onClick={onDataMigration}>
+              Migrate Data →
+            </button>
           )}
           <button className="btn-secondary" onClick={onNewSession}>New Session</button>
       </div>

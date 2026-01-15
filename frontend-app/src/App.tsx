@@ -5,9 +5,11 @@ import { Sidebar } from './components/Sidebar';
 import { ConnectionStep } from './components/ConnectionStep';
 import { SelectionStep } from './components/SelectionStep';
 import { MonitorStep } from './components/MonitorStep';
+import { ComparisonStep } from './components/ComparisonStep';
+import { DataMigrationStep } from './components/DataMigrationStep';
 import { ConnectionInfo, JobProgress, OracleObject } from './types';
 
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = "http://localhost:8080/api";
 
 function AppContent() {
   const { showToast } = useToast();
@@ -31,7 +33,7 @@ function AppContent() {
   const [jobStatus, setJobStatus] = useState<JobProgress | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('connect'); // connect, select, monitor
+  const [activeTab, setActiveTab] = useState('connect'); // connect, select, compare, monitor, data
   const [activeTabMonitor, setActiveTabMonitor] = useState('overview'); // overview, logs
   const [elapsed, setElapsed] = useState(0);
   const [history, setHistory] = useState<JobProgress[]>([]);
@@ -382,7 +384,24 @@ function AppContent() {
             uniqueTypes={uniqueTypes}
             filteredObjects={filteredObjects}
             loading={loading}
-            onStartJob={startJob}
+            onStartJob={() => setActiveTab('compare')}
+          />
+        )}
+
+        {activeTab === 'compare' && (
+          <ComparisonStep 
+            connInfo={connInfo}
+            selectedObjects={selectedObjects}
+            onContinue={startJob}
+            onBack={() => setActiveTab('select')}
+          />
+        )}
+
+        {activeTab === 'data' && (
+          <DataMigrationStep 
+            connInfo={connInfo}
+            objects={objects}
+            onBack={() => setActiveTab('monitor')}
           />
         )}
 
@@ -397,6 +416,7 @@ function AppContent() {
             selectedObjects={selectedObjects}
             connInfo={connInfo}
             onNewSession={handleNewSession}
+            onDataMigration={() => setActiveTab('data')}
           />
         )}
       </div>
