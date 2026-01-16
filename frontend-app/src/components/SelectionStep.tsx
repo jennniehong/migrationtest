@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { OracleObject } from '../types';
+import { OracleObject, ConnectionInfo, DDLComparison } from '../types';
+import { DDLCompareView } from './DDLCompareView';
+
+const API_BASE = "http://localhost:8080/api";
 
 interface SelectionStepProps {
   searchTerm: string;
@@ -12,6 +15,7 @@ interface SelectionStepProps {
   setSelectedObjects: React.Dispatch<React.SetStateAction<OracleObject[]>>;
   uniqueTypes: string[];
   filteredObjects: OracleObject[];
+  connInfo: ConnectionInfo;
   loading: boolean;
   onStartJob: () => void;
   onBack: () => void;
@@ -28,13 +32,61 @@ export const SelectionStep: React.FC<SelectionStepProps> = ({
   setSelectedObjects,
   uniqueTypes,
   filteredObjects,
+  connInfo,
   loading,
   onStartJob,
   onBack
 }) => {
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [ddlCache, setDdlCache] = useState<Record<string, DDLComparison>>({});
+  const [loadingDDL, setLoadingDDL] = useState<Set<string>>(new Set());
 
   const isSelected = (obj: OracleObject) => selectedObjects.some(s => s.name === obj.name && s.type === obj.type);
+
+  const togglePreview = async (obj: OracleObject) => {
+    const rowKey = `${obj.type}:${obj.name}`;
+    const newExpandedRows = new Set(expandedRows);
+
+    if (newExpandedRows.has(rowKey)) {
+      newExpandedRows.delete(rowKey);
+      setExpandedRows(newExpandedRows);
+      return;
+    }
+
+    // Expand
+    newExpandedRows.add(rowKey);
+    setExpandedRows(newExpandedRows);
+
+    // If not in cache, fetch it
+    if (!ddlCache[rowKey]) {
+      setLoadingDDL(prev => new Set(prev).add(rowKey));
+      try {
+        const response = await fetch(`${API_BASE}/convert/ddl`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            connection: connInfo,
+            object_name: obj.name,
+            object_type: obj.type
+          })
+        });
+
+        if (response.ok) {
+          const data: DDLComparison = await response.json();
+          setDdlCache(prev => ({ ...prev, [rowKey]: data }));
+        }
+      } catch (err) {
+        console.error("Failed to fetch DDL preview", err);
+      } finally {
+        setLoadingDDL(prev => {
+          const next = new Set(prev);
+          next.delete(rowKey);
+          return next;
+        });
+      }
+    }
+  };
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -162,24 +214,58 @@ export const SelectionStep: React.FC<SelectionStepProps> = ({
                 </td>
               </tr>
             )}
-            {filteredObjects.map(obj => (
-              <tr key={`${obj.type}-${obj.name}`}>
-                <td className="text-center">
-                  <input 
-                    type="checkbox" 
-                    checked={isSelected(obj)}
-                    onChange={(e) => {
-                      if (e.target.checked) setSelectedObjects([...selectedObjects, obj]);
-                      else setSelectedObjects(selectedObjects.filter(o => !(o.name === obj.name && o.type === obj.type)));
-                    }}
-                  />
-                </td>
-                <td>{obj.name}</td>
-                <td>
-                  <span className="status-badge bg-white/10 text-muted">{obj.type}</span>
-                </td>
-              </tr>
-            ))}
+            {filteredObjects.map(obj => {
+              const rowKey = `${obj.type}:${obj.name}`;
+              const isExpanded = expandedRows.has(rowKey);
+              const comparison = ddlCache[rowKey];
+              const isLoading = loadingDDL.has(rowKey);
+
+              return (
+                <React.Fragment key={rowKey}>
+                  <tr className={isExpanded ? 'bg-white/5' : ''}>
+                    <td className="text-center">
+                      <input 
+                        type="checkbox" 
+                        checked={isSelected(obj)}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedObjects([...selectedObjects, obj]);
+                          else setSelectedObjects(selectedObjects.filter(o => !(o.name === obj.name && o.type === obj.type)));
+                        }}
+                      />
+                    </td>
+                    <td>
+                      <div className="flex items-center justify-between group">
+                        <span>{obj.name}</span>
+                        <button 
+                          className={`btn-icon-tiny ${isExpanded ? 'active' : ''}`}
+                          onClick={() => togglePreview(obj)}
+                          title="Preview DDL Conversion"
+                        >
+                          {isExpanded ? '▼ Close' : '👁 Preview'}
+                        </button>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="status-badge bg-white/10 text-muted">{obj.type}</span>
+                    </td>
+                  </tr>
+                  {isExpanded && (
+                    <tr className="bg-white/[0.02]">
+                      <td colSpan={3} className="p-0 border-none">
+                        <div className="ddl-preview-accordion px-4 pb-4 animate-fadeIn">
+                          <DDLCompareView 
+                            comparison={comparison} 
+                            loading={isLoading} 
+                            error={null} 
+                            mode="mini" 
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>

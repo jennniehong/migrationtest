@@ -798,6 +798,106 @@ button {
 /* Download Button */
 .download-btn { text-decoration: none; display: flex; align-items: center; }
 
+/* DDL Preview Inline */
+.btn-icon-tiny {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  opacity: 0;
+  pointer-events: none;
+}
+
+tr:hover .btn-icon-tiny, .btn-icon-tiny.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.copy-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.copy-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+  border-color: var(--text-muted);
+}
+
+.copy-btn-primary:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.btn-icon-tiny:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.btn-icon-tiny.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+  opacity: 1;
+}
+
+.ddl-preview-accordion {
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
+
+.ddl-content-mini {
+  background: #000;
+  color: #d1d5db;
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+  font-family: 'Fira Code', monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  height: 250px;
+  overflow: auto;
+  border: 1px solid #333;
+}
+
+.text-primary-light {
+  color: #60a5fa;
+}
+
+.loading-spinner-small {
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ==========================================
    DDL Comparison Styles
    ========================================== */
@@ -809,32 +909,48 @@ button {
   margin-top: 1rem;
 }
 
-.ddl-panel {
+.ddl-panel, .ddl-panel-mini {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 0.75rem;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.ddl-panel {
   max-height: 600px;
 }
 
-.ddl-panel-header {
-  padding: 1rem 1.5rem;
-  background: rgba(79, 70, 229, 0.1);
+.ddl-panel-mini {
+  border-radius: 0.375rem;
+}
+
+.ddl-panel-header, .ddl-panel-header-mini {
+  padding: 0.75rem 1.25rem;
+  background: rgba(79, 70, 229, 0.08);
   border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.ddl-panel-header h4 {
+.ddl-panel-header-mini {
+  padding: 0.4rem 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.ddl-panel-header h4, .ddl-panel-header-mini h4 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.875rem;
   font-weight: 600;
 }
 
-.ddl-content {
+.ddl-panel-header-mini h4 {
+  font-size: 11px;
+}
+
+.ddl-content, .ddl-content-mini {
   flex: 1;
   overflow: auto;
   padding: 1.5rem;
@@ -848,21 +964,30 @@ button {
   word-wrap: break-word;
 }
 
-.ddl-content::-webkit-scrollbar {
+.ddl-content-mini {
+  padding: 0.75rem;
+  font-size: 11px;
+  line-height: 1.4;
+  height: 250px;
+  background: #000;
+  border: none;
+}
+
+.ddl-content::-webkit-scrollbar, .ddl-content-mini::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-.ddl-content::-webkit-scrollbar-track {
+.ddl-content::-webkit-scrollbar-track, .ddl-content-mini::-webkit-scrollbar-track {
   background: #1e293b;
 }
 
-.ddl-content::-webkit-scrollbar-thumb {
+.ddl-content::-webkit-scrollbar-thumb, .ddl-content-mini::-webkit-scrollbar-thumb {
   background: #334155;
   border-radius: 4px;
 }
 
-.ddl-content::-webkit-scrollbar-thumb:hover {
+.ddl-content::-webkit-scrollbar-thumb:hover, .ddl-content-mini::-webkit-scrollbar-thumb:hover {
   background: #475569;
 }
 

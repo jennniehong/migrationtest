@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ConnectionInfo, OracleObject } from '../types';
+import { ConnectionInfo, OracleObject, DDLComparison } from '../types';
+import { DDLCompareView } from './DDLCompareView';
 
 const API_BASE = "http://localhost:8080/api";
 
@@ -10,20 +11,13 @@ interface ComparisonStepProps {
   onBack: () => void;
 }
 
-interface DDLComparison {
-  objectName: string;
-  objectType: string;
-  sourceDDL: string;
-  convertedDDL: string | null;
-}
-
 export function ComparisonStep({ connInfo, selectedObjects, onContinue, onBack }: ComparisonStepProps) {
-  const [selectedObjectIndex, setSelectedObjectIndex] = useState(0);
+  const [selectedObjectIndex, setSelectedObjectIndex] = useState(-1);  // Start with no selection
   const [comparison, setComparison] = useState<DDLComparison | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const currentObject = selectedObjects[selectedObjectIndex];
+  const currentObject = selectedObjectIndex >= 0 ? selectedObjects[selectedObjectIndex] : null;
 
   const fetchComparison = async () => {
     if (!currentObject) return;
@@ -84,6 +78,7 @@ export function ComparisonStep({ connInfo, selectedObjects, onContinue, onBack }
           onChange={(e) => handleObjectChange(parseInt(e.target.value))}
           style={{ width: '400px' }}
         >
+          <option value="-1" disabled>-- Select an object to compare --</option>
           {selectedObjects.map((obj, index) => (
             <option key={index} value={index}>
               {obj.type}: {obj.name}
@@ -92,41 +87,20 @@ export function ComparisonStep({ connInfo, selectedObjects, onContinue, onBack }
         </select>
       </div>
 
-      {/* DDL Comparison Panels */}
-      {loading && (
-        <div className="text-center p-8">
-          <div className="step-circle active loading-spinner">↻</div>
-          <p className="mt-4">Loading DDL comparison...</p>
+      {!loading && !error && !comparison && selectedObjectIndex === -1 && (
+        <div className="text-center p-12" style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '0.5rem', border: '1px dashed var(--border)' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📋</div>
+          <h4 className="m-0 mb-2">Select an Object</h4>
+          <p className="text-muted">Choose an object from the dropdown above to view DDL comparison</p>
         </div>
       )}
 
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-300 rounded" style={{ color: '#c53030' }}>
-          <strong>Error:</strong> {error}
-        </div>
-      )}
-
-      {!loading && !error && comparison && (
-        <div className="ddl-comparison-container">
-          <div className="ddl-panel">
-            <div className="ddl-panel-header">
-              <h4>Oracle Source DDL</h4>
-              <span className="text-muted text-sm">{comparison.objectType}</span>
-            </div>
-            <pre className="ddl-content">{comparison.sourceDDL}</pre>
-          </div>
-
-          <div className="ddl-panel">
-            <div className="ddl-panel-header">
-              <h4>PostgreSQL Converted DDL</h4>
-              <span className="text-muted text-sm">Converted by ora2pg</span>
-            </div>
-            <pre className="ddl-content">
-              {comparison.convertedDDL || 'No conversion available'}
-            </pre>
-          </div>
-        </div>
-      )}
+      <DDLCompareView 
+        comparison={comparison} 
+        loading={loading} 
+        error={error} 
+        mode="full" 
+      />
 
       {/* Navigation Footer */}
       <div className="flex justify-between items-center gap-4 mt-6">

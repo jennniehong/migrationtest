@@ -24,3 +24,10 @@ export interface ConnectionInfo {
   libDir: string;
   pgVersion: number; // Target PostgreSQL version (11-16)
 }
+
+export interface DDLComparison {
+  objectName: string;
+  objectType: string;
+  sourceDDL: string;
+  convertedDDL: string | null;
+}

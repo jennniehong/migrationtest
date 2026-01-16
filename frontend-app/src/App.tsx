@@ -498,6 +498,7 @@ function AppContent() {
             setSelectedObjects={setSelectedObjects}
             uniqueTypes={uniqueTypes}
             filteredObjects={filteredObjects}
+            connInfo={connInfo}
             loading={loading}
             onStartJob={() => setActiveTab('compare')}
             onBack={() => setActiveTab('connect')}
