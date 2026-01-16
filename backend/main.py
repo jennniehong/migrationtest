@@ -133,15 +133,49 @@ async def create_job(request: JobCreateRequest, background_tasks: BackgroundTask
     def on_complete(status: JobStatus, message: str):
         """
         Callback to handle job completion and update status.
-        
-        작업 완료를 처리하고 상태를 업데이트하기 위한 콜백입니다.
+        Determines PARTIAL_DONE if some objects failed.
         """
-        jobs[job_id].status = status
         jobs[job_id].finished_at = datetime.datetime.now()
-        jobs[job_id].message = message
+        jobs[job_id].current_object = None
+        
+        # Determine final status based on results
+        if status == JobStatus.DONE:
+            if jobs[job_id].failed_objects:
+                if jobs[job_id].completed_objects:
+                    jobs[job_id].status = JobStatus.PARTIAL_DONE
+                    jobs[job_id].message = f"Completed {len(jobs[job_id].completed_objects)}, Failed {len(jobs[job_id].failed_objects)}"
+                else:
+                    jobs[job_id].status = JobStatus.FAILED
+                    jobs[job_id].message = "All objects failed"
+            else:
+                jobs[job_id].status = JobStatus.DONE
+                jobs[job_id].message = "Success"
+        else:
+            jobs[job_id].status = status
+            jobs[job_id].message = message
+
+    def on_progress(progress_msg: str):
+        """
+        Callback to handle progress updates for individual objects.
+        Supports START:/DONE:/FAIL: prefixes.
+        """
+        if progress_msg.startswith("START:"):
+            jobs[job_id].current_object = progress_msg[6:]
+        elif progress_msg.startswith("DONE:"):
+            obj_name = progress_msg[5:]
+            if obj_name not in jobs[job_id].completed_objects:
+                jobs[job_id].completed_objects.append(obj_name)
+            if jobs[job_id].current_object == obj_name:
+                jobs[job_id].current_object = None
+        elif progress_msg.startswith("FAIL:"):
+            obj_name = progress_msg[5:]
+            if obj_name not in jobs[job_id].failed_objects:
+                jobs[job_id].failed_objects.append(obj_name)
+            if jobs[job_id].current_object == obj_name:
+                jobs[job_id].current_object = None
 
     # Start the runner in the background (directory creation happens there)
-    background_tasks.add_task(runner.run, job_id, request, on_log, on_complete)
+    background_tasks.add_task(runner.run, job_id, request, on_log, on_complete, on_progress)
     
     # Return immediately without waiting for filesystem operations
     return {"jobId": job_id}
@@ -408,9 +442,38 @@ async def create_data_migration_job(request: DataMigrationRequest, background_ta
         job_logs[job_id].append(f"[{datetime.datetime.now()}] {msg}")
     
     def on_complete(status: JobStatus, message: str):
-        jobs[job_id].status = status
         jobs[job_id].finished_at = datetime.datetime.now()
-        jobs[job_id].message = message
+        jobs[job_id].current_object = None
+        if status == JobStatus.DONE:
+            if jobs[job_id].failed_objects:
+                if jobs[job_id].completed_objects:
+                    jobs[job_id].status = JobStatus.PARTIAL_DONE
+                    jobs[job_id].message = f"Completed {len(jobs[job_id].completed_objects)}, Failed {len(jobs[job_id].failed_objects)}"
+                else:
+                    jobs[job_id].status = JobStatus.FAILED
+                    jobs[job_id].message = "All objects failed"
+            else:
+                jobs[job_id].status = JobStatus.DONE
+                jobs[job_id].message = "Success"
+        else:
+            jobs[job_id].status = status
+            jobs[job_id].message = message
+
+    def on_progress(progress_msg: str):
+        if progress_msg.startswith("START:"):
+            jobs[job_id].current_object = progress_msg[6:]
+        elif progress_msg.startswith("DONE:"):
+            obj_name = progress_msg[5:]
+            if obj_name not in jobs[job_id].completed_objects:
+                jobs[job_id].completed_objects.append(obj_name)
+            if jobs[job_id].current_object == obj_name:
+                jobs[job_id].current_object = None
+        elif progress_msg.startswith("FAIL:"):
+            obj_name = progress_msg[5:]
+            if obj_name not in jobs[job_id].failed_objects:
+                jobs[job_id].failed_objects.append(obj_name)
+            if jobs[job_id].current_object == obj_name:
+                jobs[job_id].current_object = None
     
     # Start data migration in background
     jobs[job_id].status = JobStatus.RUNNING
@@ -425,7 +488,16 @@ async def create_data_migration_job(request: DataMigrationRequest, background_ta
         outputFormat="COPY"  # Use COPY for data migration
     )
     
-    background_tasks.add_task(runner.run, job_id, migration_request, on_log, on_complete)
+    def on_progress(obj_name: str):
+        if obj_name.startswith("START:"):
+            jobs[job_id].current_object = obj_name[6:]
+        else:
+            if obj_name not in jobs[job_id].completed_objects:
+                jobs[job_id].completed_objects.append(obj_name)
+            if jobs[job_id].current_object == obj_name:
+                jobs[job_id].current_object = None
+    
+    background_tasks.add_task(runner.run, job_id, migration_request, on_log, on_complete, on_progress)
     
     return {"jobId": job_id}
 

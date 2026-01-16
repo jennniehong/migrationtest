@@ -18,6 +18,7 @@ interface MonitorStepProps {
   onNewSession: () => void;
   onBackToComparison: () => void;
   onDataMigration?: () => void;
+  onCancel?: () => void;
 }
 
 export const MonitorStep: React.FC<MonitorStepProps> = ({
@@ -31,7 +32,8 @@ export const MonitorStep: React.FC<MonitorStepProps> = ({
   connInfo,
   onNewSession,
   onBackToComparison,
-  onDataMigration
+  onDataMigration,
+  onCancel
 }) => {
   const logContainerRef = useRef<HTMLDivElement>(null);
 
@@ -128,16 +130,53 @@ export const MonitorStep: React.FC<MonitorStepProps> = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {selectedObjects.slice(0, 10).map(obj => (
-                    <tr key={obj.name} className="border-top">
-                      <td>{obj.name}</td>
-                      <td>
-                        <span style={jobStatus?.status === 'DONE' ? { color: 'var(--success)' } : { color: 'var(--primary)' }}>
-                          {jobStatus?.status === 'DONE' ? 'Completed' : (jobStatus?.status === 'RUNNING' ? 'In Progress' : 'Pending')}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {selectedObjects.slice(0, 10).map(obj => {
+                    const objNameUpper = obj.name.toUpperCase();
+                    const isCompleted = jobStatus?.completed_objects?.includes(objNameUpper) 
+                      || (jobStatus?.status === 'DONE' && !jobStatus?.failed_objects?.includes(objNameUpper));
+                    const isFailed = jobStatus?.failed_objects?.includes(objNameUpper);
+                    const isCurrent = jobStatus?.current_object?.toUpperCase() === objNameUpper;
+                    const isJobRunning = jobStatus?.status === 'RUNNING';
+                    
+                    let statusText = 'Pending';
+                    let statusColor = 'rgba(255, 255, 255, 0.2)';
+                    let statusIcon = '';
+                    
+                    if (isFailed) {
+                      statusText = 'Failed';
+                      statusColor = 'var(--error)';
+                      statusIcon = '✗';
+                    } else if (isCompleted) {
+                      statusText = 'Completed';
+                      statusColor = 'var(--success)';
+                      statusIcon = '✓';
+                    } else if (isCurrent) {
+                      statusText = 'In Progress';
+                      statusColor = 'var(--primary)';
+                    } else if (isJobRunning) {
+                      statusText = 'Pending';
+                      statusColor = 'rgba(255, 255, 255, 0.4)';
+                    }
+
+                    return (
+                      <tr key={obj.name} className="border-top">
+                        <td>{obj.name}</td>
+                        <td>
+                          <span style={{ 
+                            color: statusColor, 
+                            fontWeight: (isCompleted || isCurrent || isFailed) ? 'bold' : 'normal',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}>
+                            {isCurrent && <div className="loading-spinner-small" style={{ width: '12px', height: '12px', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: 'var(--primary)' }}></div>}
+                            {statusIcon && <span>{statusIcon}</span>}
+                            {statusText}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {selectedObjects.length > 10 && <tr><td colSpan={2} className="p-2 text-center text-muted">... and {selectedObjects.length - 10} more</td></tr>}
                 </tbody>
               </table>
@@ -171,7 +210,16 @@ export const MonitorStep: React.FC<MonitorStepProps> = ({
           </button>
         </div>
         <div className="flex gap-3">
-          {jobStatus?.status === 'DONE' && (
+          {jobStatus?.status === 'RUNNING' && onCancel && (
+            <button 
+              className="btn-secondary" 
+              onClick={onCancel}
+              style={{ borderColor: 'var(--error)', color: 'var(--error)' }}
+            >
+              ✗ Cancel Job
+            </button>
+          )}
+          {(jobStatus?.status === 'DONE' || jobStatus?.status === 'PARTIAL_DONE') && (
             <>
               <a 
                 href={`${API_BASE}/jobs/${jobId}/download`}

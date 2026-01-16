@@ -3,13 +3,18 @@ export interface OracleObject {
   type: string;
 }
 
+export type JobStatus = 'CREATED' | 'RUNNING' | 'DONE' | 'PARTIAL_DONE' | 'FAILED' | 'CANCELED';
+
 export interface JobProgress {
   job_id: string;
-  status: string;
+  status: JobStatus;
   created_at: string;
   finished_at?: string;
   message?: string;
   selected_objects?: OracleObject[];
+  completed_objects?: string[];
+  failed_objects?: string[];
+  current_object?: string;
 }
 
 export interface ConnectionInfo {

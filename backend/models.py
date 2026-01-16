@@ -14,11 +14,12 @@ class JobStatus(str, Enum):
     
     마이그레이션 작업의 수명 주기 상태를 나타내는 열거형입니다.
     """
-    CREATED = "CREATED"   # Job initialized but not started
-    RUNNING = "RUNNING"   # Migration process is active (Docker running)
-    DONE = "DONE"         # Migration completed successfully
-    FAILED = "FAILED"     # Migration encountered a fatal error
-    CANCELED = "CANCELED" # User manually stopped the job
+    CREATED = "CREATED"       # Job initialized but not started
+    RUNNING = "RUNNING"       # Migration process is active (Docker running)
+    DONE = "DONE"             # Migration completed successfully
+    PARTIAL_DONE = "PARTIAL_DONE"  # Some objects failed, others succeeded
+    FAILED = "FAILED"         # Migration encountered a fatal error
+    CANCELED = "CANCELED"     # User manually stopped the job
 
 # ==========================================
 # Connection Models
@@ -85,6 +86,9 @@ class JobProgress(BaseModel):
     finished_at: Optional[datetime.datetime] = None
     message: Optional[str] = None
     selected_objects: Optional[List[OracleObject]] = None
+    completed_objects: List[str] = []  # List of object names that have finished processing
+    failed_objects: List[str] = []     # List of object names that failed processing
+    current_object: Optional[str] = None # Name of the object currently being processed
 
 class LogEntry(BaseModel):
     """

@@ -4,6 +4,7 @@ import threading
 import datetime
 import zipfile
 import time
+import re
 from typing import List, Callable, Dict
 from models import JobStatus, JobCreateRequest
 
@@ -15,7 +16,7 @@ class BaseRunner:
     마이그레이션 실행기를 위한 추상 기본 클래스입니다.
     프로덕션에는 DockerRunner를 사용하십시오. LocalRunner는 셸에서 직접 실행하기 위해 구현될 수 있습니다.
     """
-    def run(self, job_id: str, request: JobCreateRequest, on_log: Callable[[str], None], on_complete: Callable[[JobStatus, str], None]):
+    def run(self, job_id: str, request: JobCreateRequest, on_log: Callable[[str], None], on_complete: Callable[[JobStatus, str], None], on_progress: Callable[[str], None]):
         """
         Executes the migration job.
         
@@ -68,7 +69,7 @@ class DockerRunner(BaseRunner):
                     except subprocess.TimeoutExpired:
                         proc.kill()
 
-    def run(self, job_id: str, request: JobCreateRequest, on_log: Callable[[str], None], on_complete: Callable[[JobStatus, str], None]):
+    def run(self, job_id: str, request: JobCreateRequest, on_log: Callable[[str], None], on_complete: Callable[[JobStatus, str], None], on_progress: Callable[[str], None]):
         """
         Orchestrates the migration workflow:
         1. Prepare configurations.
@@ -100,77 +101,71 @@ class DockerRunner(BaseRunner):
             
             conn = request.connection
             
-            # 1. Group objects by type to optimize execution
-            from collections import defaultdict
-            type_groups = defaultdict(list)
-            for obj in request.objects:
-                type_groups[obj.type].append(obj.name)
-            
-            if not type_groups:
-                raise Exception("No objects selected for migration.")
-
             # Ora2Pg DSN Construction
             if conn.sid:
                 dsn = f"dbi:Oracle:host={conn.host};sid={conn.sid};port={conn.port}"
             else:
                 dsn = f"dbi:Oracle:host={conn.host};service_name={conn.service_name};port={conn.port}"
 
-            for obj_type, names in type_groups.items():
-                # Check cancellation before starting next type batch
+            # Mapping Oracle OBJECT_TYPE to Ora2Pg TYPE
+            type_map = {
+                'TABLE': 'TABLE',
+                'VIEW': 'VIEW',
+                'SEQUENCE': 'SEQUENCE',
+                'INDEX': 'INDEX',
+                'TRIGGER': 'TRIGGER',
+                'FUNCTION': 'FUNCTION',
+                'PROCEDURE': 'PROCEDURE',
+                'PACKAGE': 'PACKAGE',
+                'PACKAGE BODY': 'PACKAGE'
+            }
+            
+            # Determine extension
+            ext = ".sql"
+            if request.output_format == "CSV":
+                ext = ".csv"
+
+            total_objects = len(request.objects)
+            if total_objects == 0:
+                raise Exception("No objects selected for migration.")
+
+            # Process each object individually for real-time tracking
+            for idx, obj in enumerate(request.objects):
+                obj_name = obj.name
+                obj_type = obj.type
+                ora2pg_type = type_map.get(obj_type, obj_type)
+                
+                # Check cancellation before each object
                 with self.lock:
                     if self.active_jobs[job_id]['canceled']:
                         on_log("Job canceled by user.")
                         on_complete(JobStatus.CANCELED, "Canceled")
                         return
 
-                on_log(f"Processing type: {obj_type} ({len(names)} objects)")
-                
-                # Mapping Oracle OBJECT_TYPE to Ora2Pg TYPE
-                # https://ora2pg.darold.net/documentation.html#TYPE
-                type_map = {
-                    'TABLE': 'TABLE',
-                    'VIEW': 'VIEW',
-                    'SEQUENCE': 'SEQUENCE',
-                    'INDEX': 'INDEX',
-                    'TRIGGER': 'TRIGGER',
-                    'FUNCTION': 'FUNCTION',
-                    'PROCEDURE': 'PROCEDURE',
-                    'PACKAGE': 'PACKAGE',
-                    'PACKAGE BODY': 'PACKAGE'
-                }
-                
-                ora2pg_type = type_map.get(obj_type, obj_type)
-                
-                # Determine extension
-                ext = ".sql"
-                if request.output_format == "CSV":
-                    ext = ".csv"
+                on_log(f"[{idx+1}/{total_objects}] Processing {obj_type}: {obj_name}")
+                on_progress(f"START:{obj_name}")
 
-                # 2. Generate temporary ora2pg.conf for this specific type execution
-                # We use a unique output filename for each type to avoid overwriting (though FILE_PER_TABLE does this anyway)
+                # Generate ora2pg.conf for this specific object
                 config_content = f"""
 ORACLE_DSN      {dsn}
 ORACLE_USER     {conn.user}
 ORACLE_PWD      {conn.password}
 SCHEMA          {conn.schema_name}
 TYPE            {ora2pg_type}
-OUTPUT          {ora2pg_type.lower()}_output{ext}
+ALLOW           {obj_name}
+OUTPUT          {obj_name.lower()}{ext}
 OUTPUT_DIR      /data/out
 FILE_PER_TABLE  1
 """
                 with open(conf_path, "w") as f:
                     f.write(config_content)
 
-                on_log(f"Starting Ora2Pg Docker for {obj_type} ({ora2pg_type})...")
-                
-                # 3. Run Ora2Pg via Docker
-                # Mount the job directory to /data inside container
+                # Run Ora2Pg via Docker for this single object
                 cmd = [
                     "docker", "run", "--rm",
                     "-v", f"{job_dir}:/data",
                     "ora2pg-runner",
-                    "-c", "/data/ora2pg.conf",
-                    "-a", ",".join(names)
+                    "-c", "/data/ora2pg.conf"
                 ]
 
                 # Start process ensuring output can be captured
@@ -187,9 +182,8 @@ FILE_PER_TABLE  1
 
                 # Stream logs line by line
                 for line in process.stdout:
-                    on_log(f"[{obj_type}] {line.strip()}")
-                    # Check cancellation during output reading? 
-                    # Simpler to rely on Popen.terminate() from cancel_job breaking the pipe or loop eventually
+                    stripped_line = line.strip()
+                    on_log(f"  {stripped_line}")
                     
                 process.wait()
 
@@ -201,10 +195,15 @@ FILE_PER_TABLE  1
                         on_complete(JobStatus.CANCELED, "Canceled")
                         return
 
-                if process.returncode != 0:
-                    on_log(f"Warning: Ora2Pg failed for {obj_type} (Exit: {process.returncode})")
+                # Report success or failure for this specific object
+                if process.returncode == 0:
+                    on_log(f"  ✓ {obj_name} completed successfully")
+                    on_progress(f"DONE:{obj_name}")
+                else:
+                    on_log(f"  ✗ {obj_name} failed (Exit: {process.returncode})")
+                    on_progress(f"FAIL:{obj_name}")
 
-            # 4. Packaging results
+            # Packaging results
             on_log("Packaging results into ZIP...")
             zip_path = os.path.join(job_dir, f"result_{job_id}.zip")
             with zipfile.ZipFile(zip_path, 'w') as zipf:
@@ -213,8 +212,9 @@ FILE_PER_TABLE  1
                         file_path = os.path.join(root, file)
                         zipf.write(file_path, os.path.relpath(file_path, out_dir))
             
-            on_log(f"Job completed successfully. Result: {zip_path}")
-            on_complete(JobStatus.DONE, "Success")
+            on_log(f"Job finished. Result: {zip_path}")
+            # Final status is determined by main.py based on completed_objects vs failed_objects
+            on_complete(JobStatus.DONE, "Finished")
             
         except Exception as e:
             on_log(f"Error: {str(e)}")

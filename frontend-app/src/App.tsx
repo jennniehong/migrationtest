@@ -261,6 +261,22 @@ function AppContent() {
     });
   };
 
+  const handleCancelJob = async () => {
+    if (!jobId) return;
+    try {
+      const res = await fetch(`${API_BASE}/jobs/${jobId}/cancel`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        showToast('Job cancellation requested', 'info');
+      } else {
+        showToast('Failed to cancel job', 'error');
+      }
+    } catch (e) {
+      showToast('Error canceling job', 'error');
+    }
+  };
+
   const fetchObjects = async () => {
     setLoading(true);
     const controller = new AbortController();
@@ -360,7 +376,7 @@ function AppContent() {
         } catch (e) {
           console.error("Polling error", e);
         }
-      }, 2000);
+      }, 1000);
     }
     return () => clearInterval(interval);
   }, [jobId, activeTab]);
@@ -535,6 +551,7 @@ function AppContent() {
             onNewSession={handleNewSession}
             onBackToComparison={() => setActiveTab('compare')}
             onDataMigration={() => setActiveTab('data')}
+            onCancel={handleCancelJob}
           />
         )}
       </div>
