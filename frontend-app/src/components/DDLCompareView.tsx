@@ -66,7 +66,7 @@ export function DDLCompareView({
   // Loading state UI / 로딩 상태 UI
   if (loading) {
     return (
-      <div className={`ddl-compare-status ${mode === 'mini' ? 'p-4 bg-black/10' : 'p-8 text-center'}`}>
+      <div className={`ddl-compare-status ${mode === 'mini' ? 'p-4 bg-slate-50' : 'p-8 text-center'}`}>
         <div className={mode === 'mini' ? 'loading-spinner-small mx-auto mb-2' : 'step-circle active loading-spinner'}>
           {mode === 'mini' ? '' : '↻'}
         </div>
@@ -80,7 +80,7 @@ export function DDLCompareView({
   // Error state UI / 오류 상태 UI
   if (error) {
     return (
-      <div className={`p-4 bg-red-400/5 border border-red-400/20 rounded-lg text-red-400 ${mode === 'mini' ? 'text-xs' : ''}`}>
+      <div className={`p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 ${mode === 'mini' ? 'text-xs' : ''}`}>
         <strong>Error:</strong> {error}
       </div>
     );

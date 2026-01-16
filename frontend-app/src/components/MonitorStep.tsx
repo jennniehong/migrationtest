@@ -34,10 +34,8 @@ interface MonitorStepProps {
   connInfo: ConnectionInfo;
   /** Callback to start a new session / 새 세션 시작 콜백 */
   onNewSession: () => void;
-  /** Callback to go back to comparison view / 비교 뷰로 돌아가기 콜백 */
-  onBackToComparison: () => void;
-  /** Optional callback for data export / 데이터 내보내기용 선택적 콜백 */
-  onDataMigration?: () => void;
+  /** Callback to go back to selection view / 선택 뷰로 돌아가기 콜백 */
+  onBackToSelection: () => void;
   /** Optional callback to cancel running job / 실행 중인 작업 취소용 선택적 콜백 */
   onCancel?: () => void;
 }
@@ -64,8 +62,7 @@ export const MonitorStep: React.FC<MonitorStepProps> = ({
   selectedObjects,
   connInfo,
   onNewSession,
-  onBackToComparison,
-  onDataMigration,
+  onBackToSelection,
   onCancel
 }) => {
   // Ref for auto-scrolling log container / 로그 컨테이너 자동 스크롤용 Ref
@@ -240,8 +237,8 @@ export const MonitorStep: React.FC<MonitorStepProps> = ({
 
       <div className="flex justify-between items-center gap-4 mt-8">
         <div className="flex gap-3">
-          <button className="btn-secondary" onClick={onBackToComparison}>
-            ← Back to Comparison
+          <button className="btn-secondary" onClick={onBackToSelection}>
+            ← Back to Selection
           </button>
           <button className="btn-secondary" onClick={onNewSession}>
             New Session
@@ -265,11 +262,6 @@ export const MonitorStep: React.FC<MonitorStepProps> = ({
               >
                 📥 Download Results (ZIP)
               </a>
-              {onDataMigration && (
-                <button className="btn-primary" onClick={onDataMigration}>
-                  Export Data →
-                </button>
-              )}
             </>
           )}
           {jobStatus?.status === 'PARTIAL_DONE' && jobStatus?.failed_objects && jobStatus.failed_objects.length > 0 && (

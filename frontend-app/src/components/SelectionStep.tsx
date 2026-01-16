@@ -41,8 +41,10 @@ interface SelectionStepProps {
   connInfo: ConnectionInfo;
   /** Loading state indicator / 로딩 상태 표시 */
   loading: boolean;
-  /** Callback to start the job / 작업 시작 콜백 */
-  onStartJob: () => void;
+  /** Callback to start DDL migration job / DDL 마이그레이션 작업 시작 콜백 */
+  onStartMigration: () => void;
+  /** Callback when data export job starts / 데이터 내보내기 작업 시작 시 콜백 */
+  onDataExportStarted: (jobId: string) => void;
   /** Callback to go back to previous step / 이전 단계로 돌아가기 콜백 */
   onBack: () => void;
 }
@@ -72,9 +74,16 @@ export const SelectionStep: React.FC<SelectionStepProps> = ({
   filteredObjects,
   connInfo,
   loading,
-  onStartJob,
+  onStartMigration,
+  onDataExportStarted,
   onBack
 }) => {
+  // Data export accordion state / 데이터 내보내기 아코디언 상태
+  const [dataExportExpanded, setDataExportExpanded] = useState(false);
+  const [batchSize, setBatchSize] = useState(1000);
+  const [localFormat, setLocalFormat] = useState(outputFormat);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   // Dropdown state for type filter / 타입 필터 드롭다운 상태
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
   // Set of expanded rows showing DDL preview / DDL 미리보기를 표시하는 확장된 행 집합
@@ -316,16 +325,140 @@ export const SelectionStep: React.FC<SelectionStepProps> = ({
         </table>
       </div>
 
+      {/* Data Export Accordion */}
+      {dataExportExpanded && (
+        <div className="card mt-4" style={{ background: 'var(--bg-dark)', border: '2px solid var(--primary)' }}>
+          <div className="p-4">
+            <h4 className="text-lg font-semibold mb-4">Data Export Configuration</h4>
+            
+            <div className="flex gap-8 items-center mb-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Batch Size:</label>
+                <input
+                  type="number"
+                  className="input-field"
+                  value={batchSize}
+                  onChange={(e) => setBatchSize(parseInt(e.target.value) || 1000)}
+                  min={100}
+                  max={10000}
+                  step={100}
+                  style={{ width: '150px' }}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Output Format:</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="radio" 
+                      name="dataOutputFormat" 
+                      value="SQL" 
+                      checked={localFormat === 'SQL'} 
+                      onChange={() => setLocalFormat('SQL')}
+                    />
+                    <span>SQL (COPY)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="radio" 
+                      name="dataOutputFormat" 
+                      value="CSV" 
+                      checked={localFormat === 'CSV'} 
+                      onChange={() => setLocalFormat('CSV')}
+                    />
+                    <span>CSV</span>
+                  </label>
+                </div>
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-muted">
+                  SQL format uses standard PostgreSQL COPY. CSV is suitable for external tools.
+                </p>
+              </div>
+            </div>
+
+            {exportError && (
+              <div className="mb-3 p-3 bg-red-50 border border-red-300 rounded" style={{ color: '#c53030' }}>
+                {exportError}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button 
+                className="btn-secondary"
+                onClick={() => setDataExportExpanded(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn-primary"
+                onClick={async () => {
+                  const tablesToExport = selectedObjects.filter(obj => obj.type === 'TABLE');
+                  if (tablesToExport.length === 0) {
+                    setExportError('No tables selected for data export');
+                    return;
+                  }
+
+                  setExportLoading(true);
+                  setExportError(null);
+
+                  try {
+                    const actualFormat = localFormat === 'SQL' ? 'COPY' : localFormat;
+                    const response = await fetch(`${API_BASE}/jobs/data-migration`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        connection: connInfo,
+                        tables: tablesToExport.map(t => t.name),
+                        batch_size: batchSize,
+                        outputFormat: actualFormat
+                      })
+                    });
+
+                    if (!response.ok) {
+                      throw new Error('Failed to start data export');
+                    }
+
+                    const data = await response.json();
+                    onDataExportStarted(data.jobId);
+                  } catch (err: any) {
+                    setExportError(err.message || 'Failed to start data export');
+                  } finally {
+                    setExportLoading(false);
+                  }
+                }}
+                disabled={exportLoading || selectedObjects.filter(obj => obj.type === 'TABLE').length === 0}
+              >
+                {exportLoading ? 'Starting...' : `🚀 Start Data Export (${selectedObjects.filter(obj => obj.type === 'TABLE').length} tables)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center gap-4 mt-4 pt-4 border-t border-border">
         <button className="btn-secondary" onClick={onBack}>
           ← Back to Connection
         </button>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-muted">
-            {selectedObjects.length === 0 ? 'Select objects to proceed' : `${selectedObjects.length} object(s) ready`}
+          <span className="text-sm text-muted mr-2">
+            {selectedObjects.length === 0 ? 'Select objects to proceed' : `${selectedObjects.length} object(s) selected`}
           </span>
-          <button className="btn-primary" onClick={onStartJob} disabled={loading || selectedObjects.length === 0}>
-            {loading ? 'Starting...' : 'Continue to Comparison →'}
+          <button 
+            className="btn-secondary" 
+            onClick={() => setDataExportExpanded(!dataExportExpanded)} 
+            disabled={loading || selectedObjects.length === 0}
+            title="Configure data export for selected tables"
+          >
+            {dataExportExpanded ? '▼ Hide Data Export' : '📊 Prepare Data Export'}
+          </button>
+          <button 
+            className="btn-primary" 
+            onClick={onStartMigration} 
+            disabled={loading || selectedObjects.length === 0}
+            title="Download DDL migration files"
+          >
+            {loading ? 'Starting...' : '📥 Download DDL'}
           </button>
         </div>
       </div>

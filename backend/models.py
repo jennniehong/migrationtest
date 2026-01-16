@@ -144,3 +144,7 @@ class DataMigrationRequest(BaseModel):
     connection: OracleConnInfo
     tables: List[str]  # List of table names to migrate data
     batch_size: int = 1000  # Number of rows per batch
+    output_format: str = Field("COPY", alias="outputFormat") # SQL(COPY) or CSV
+
+    class Config:
+        populate_by_name = True

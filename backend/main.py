@@ -533,10 +533,13 @@ async def create_data_migration_job(request: DataMigrationRequest, background_ta
     table_objects = [OracleObject(name=t, type="TABLE") for t in request.tables]
     
     # Create a modified request that focuses on DATA export
+    # SQL format in frontend (which includes COPY) maps to "COPY" for ora2pg data export
+    actual_format = "COPY" if request.output_format == "SQL" else request.output_format
+    
     migration_request = JobCreateRequest(
         connection=request.connection,
         objects=table_objects,
-        outputFormat="COPY"  # Use COPY for data migration
+        outputFormat=actual_format
     )
     
     def on_progress(obj_name: str):

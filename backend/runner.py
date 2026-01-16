@@ -120,6 +120,9 @@ class DockerRunner(BaseRunner):
                 'PACKAGE BODY': 'PACKAGE'
             }
             
+            # Determine if this is a data export (COPY/CSV) or DDL export
+            is_data_export = request.output_format in ["COPY", "CSV"]
+            
             # Determine extension
             ext = ".sql"
             if request.output_format == "CSV":
@@ -133,7 +136,12 @@ class DockerRunner(BaseRunner):
             for idx, obj in enumerate(request.objects):
                 obj_name = obj.name
                 obj_type = obj.type
-                ora2pg_type = type_map.get(obj_type, obj_type)
+                
+                # For data export, use COPY type; for DDL, use object type
+                if is_data_export:
+                    ora2pg_type = "COPY"
+                else:
+                    ora2pg_type = type_map.get(obj_type, obj_type)
                 
                 # Check cancellation before each object
                 with self.lock:
@@ -142,10 +150,14 @@ class DockerRunner(BaseRunner):
                         on_complete(JobStatus.CANCELED, "Canceled")
                         return
 
-                on_log(f"[{idx+1}/{total_objects}] Processing {obj_type}: {obj_name}")
+                export_type_label = "data" if is_data_export else "DDL"
+                on_log(f"[{idx+1}/{total_objects}] Exporting {export_type_label} for {obj_type}: {obj_name}")
                 on_progress(f"START:{obj_name}")
 
                 # Generate ora2pg.conf for this specific object
+                # For CSV export, we need to add DATA_TYPE CSV
+                data_type_cfg = "DATA_TYPE       CSV" if request.output_format == "CSV" else ""
+
                 config_content = f"""
 ORACLE_DSN      {dsn}
 ORACLE_USER     {conn.user}
@@ -153,6 +165,9 @@ ORACLE_PWD      {conn.password}
 SCHEMA          {conn.schema_name}
 TYPE            {ora2pg_type}
 ALLOW           {obj_name}
+CLIENT_ENCODING UTF8
+BINMODE         :utf8
+{data_type_cfg}
 OUTPUT          {obj_name.lower()}{ext}
 OUTPUT_DIR      /data/out
 FILE_PER_TABLE  1
@@ -161,8 +176,10 @@ FILE_PER_TABLE  1
                     f.write(config_content)
 
                 # Run Ora2Pg via Docker for this single object
+                # We set NLS_LANG to ensure Oracle client handles UTF-8 correctly
                 cmd = [
                     "docker", "run", "--rm",
+                    "-e", "NLS_LANG=AMERICAN_AMERICA.AL32UTF8",
                     "-v", f"{job_dir}:/data",
                     "ora2pg-runner",
                     "-c", "/data/ora2pg.conf"

@@ -19,6 +19,12 @@ interface DataMigrationStepProps {
   connInfo: ConnectionInfo;
   /** List of available Oracle objects / 사용 가능한 Oracle 객체 목록 */
   objects: OracleObject[];
+  /** List of already selected objects / 이미 선택된 객체 목록 */
+  selectedObjects: OracleObject[];
+  /** Preferred output format (SQL/CSV) / 선호하는 출력 형식 */
+  outputFormat: string;
+  /** Callback when job starts / 작업 시작 시 콜백 */
+  onJobStarted: (jobId: string) => void;
   /** Callback to navigate back / 뒤로 가기 콜백 */
   onBack: () => void;
 }
@@ -33,20 +39,27 @@ interface DataMigrationStepProps {
  * @param props - Component props / 컴포넌트 props
  * @returns JSX element / JSX 요소
  */
-export function DataMigrationStep({ connInfo, objects, onBack }: DataMigrationStepProps) {
+export function DataMigrationStep({ connInfo, objects, selectedObjects, outputFormat, onJobStarted, onBack }: DataMigrationStepProps) {
+  // Filter only TABLE type objects / TABLE 타입 객체만 필터링
+  const tables = objects.filter(obj => obj.type === 'TABLE');
+  
   // Selected table names for export / 내보내기용 선택된 테이블 이름들
-  const [selectedTables, setSelectedTables] = useState<string[]>([]);
+  // Initialize with tables that were already selected in the Selection step
+  const [selectedTables, setSelectedTables] = useState<string[]>(() => {
+    return selectedObjects
+      .filter(obj => obj.type === 'TABLE')
+      .map(obj => obj.name);
+  });
   // Batch size for data processing / 데이터 처리 배치 크기
   const [batchSize, setBatchSize] = useState(1000);
+  // Local output format for data export / 데이터 내보내기용 로컬 출력 형식
+  const [localFormat, setLocalFormat] = useState(outputFormat);
   // Job ID after export starts / 내보내기 시작 후 작업 ID
   const [jobId, setJobId] = useState<string | null>(null);
   // Loading state / 로딩 상태
   const [loading, setLoading] = useState(false);
   // Error message / 오류 메시지
   const [error, setError] = useState<string | null>(null);
-
-  // Filter only TABLE type objects / TABLE 타입 객체만 필터링
-  const tables = objects.filter(obj => obj.type === 'TABLE');
 
   /**
    * Toggle selection state of a table.
@@ -96,7 +109,8 @@ export function DataMigrationStep({ connInfo, objects, onBack }: DataMigrationSt
         body: JSON.stringify({
           connection: connInfo,
           tables: selectedTables,
-          batch_size: batchSize
+          batch_size: batchSize,
+          outputFormat: localFormat
         })
       });
 
@@ -106,6 +120,7 @@ export function DataMigrationStep({ connInfo, objects, onBack }: DataMigrationSt
 
       const data = await response.json();
       setJobId(data.jobId);
+      onJobStarted(data.jobId);
     } catch (err: any) {
       setError(err.message || 'Failed to start data migration');
     } finally {
@@ -131,7 +146,7 @@ export function DataMigrationStep({ connInfo, objects, onBack }: DataMigrationSt
         <>
           {/* Configuration Panel */}
           <div className="card mb-4" style={{ padding: '1rem' }}>
-            <div className="flex gap-6 items-center">
+            <div className="flex gap-12 items-center">
               <div>
                 <label className="block text-sm font-medium mb-2">Batch Size:</label>
                 <input
@@ -145,9 +160,34 @@ export function DataMigrationStep({ connInfo, objects, onBack }: DataMigrationSt
                   style={{ width: '150px' }}
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Output Format:</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="radio" 
+                      name="dataOutputFormat" 
+                      value="SQL" 
+                      checked={localFormat === 'SQL'} 
+                      onChange={() => setLocalFormat('SQL')}
+                    />
+                    <span>SQL (COPY)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="radio" 
+                      name="dataOutputFormat" 
+                      value="CSV" 
+                      checked={localFormat === 'CSV'} 
+                      onChange={() => setLocalFormat('CSV')}
+                    />
+                    <span>CSV</span>
+                  </label>
+                </div>
+              </div>
               <div className="flex-1">
                 <p className="text-sm text-muted">
-                  Number of rows to process per batch. Lower values use less memory but may be slower.
+                  SQL format uses standard PostgreSQL COPY. CSV is suitable for external tools.
                 </p>
               </div>
             </div>

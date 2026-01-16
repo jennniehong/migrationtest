@@ -6,7 +6,6 @@ import { ConnectionStep } from './components/ConnectionStep';
 import { SelectionStep } from './components/SelectionStep';
 import { MonitorStep } from './components/MonitorStep';
 import { ComparisonStep } from './components/ComparisonStep';
-import { DataMigrationStep } from './components/DataMigrationStep';
 import { ConnectionInfo, JobProgress, OracleObject } from './types';
 
 const API_BASE = "http://localhost:8080/api";
@@ -42,7 +41,7 @@ function AppContent() {
   const [jobStatus, setJobStatus] = useState<JobProgress | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('connect'); // connect, select, compare, monitor, data
+  const [activeTab, setActiveTab] = useState('connect'); // connect, select, monitor
   const [activeTabMonitor, setActiveTabMonitor] = useState('overview'); // overview, logs
   const [elapsed, setElapsed] = useState(0);
   const [history, setHistory] = useState<JobProgress[]>([]);
@@ -439,19 +438,11 @@ function AppContent() {
                 2. Selection
               </button>
               <button 
-                className={`tab-btn ${activeTab === 'compare' ? 'active' : ''}`}
-                onClick={() => setActiveTab('compare')}
-                disabled={selectedObjects.length === 0}
-                style={{ opacity: selectedObjects.length === 0 ? 0.5 : 1, cursor: selectedObjects.length === 0 ? 'not-allowed' : 'pointer' }}
-              >
-                3. Comparison
-              </button>
-              <button 
                 className="tab-btn"
                 disabled={true}
                 style={{ opacity: 0.5, cursor: 'not-allowed' }}
               >
-                4. Monitor
+                3. Monitor
               </button>
             </>
           ) : (
@@ -473,19 +464,10 @@ function AppContent() {
                 ✓ Selection
               </button>
               <button 
-                className={`tab-btn ${activeTab === 'compare' ? 'active' : ''}`}
-                onClick={() => setActiveTab('compare')}
-                disabled={selectedObjects.length === 0}
-                style={{ opacity: selectedObjects.length === 0 ? 0.5 : 0.8, cursor: selectedObjects.length === 0 ? 'not-allowed' : 'pointer' }}
-                title="View DDL comparison"
-              >
-                ✓ Comparison
-              </button>
-              <button 
                 className={`tab-btn ${activeTab === 'monitor' ? 'active' : ''}`}
                 onClick={() => setActiveTab('monitor')}
               >
-                4. Monitor
+                3. Monitor
               </button>
             </>
           )}
@@ -516,25 +498,24 @@ function AppContent() {
             filteredObjects={filteredObjects}
             connInfo={connInfo}
             loading={loading}
-            onStartJob={() => setActiveTab('compare')}
+            onStartMigration={startJob}
+            onDataExportStarted={(id) => {
+              setJobId(id);
+              setActiveTab('monitor');
+            }}
             onBack={() => setActiveTab('connect')}
           />
         )}
 
+        {/* Comparison is now mostly used for inline preview, 
+            but kept the state logic for flexibility if needed to show standalone later */}
         {activeTab === 'compare' && (
           <ComparisonStep 
             connInfo={connInfo}
             selectedObjects={selectedObjects}
             onContinue={startJob}
+            onExportData={() => setActiveTab('data')}
             onBack={() => setActiveTab('select')}
-          />
-        )}
-
-        {activeTab === 'data' && (
-          <DataMigrationStep 
-            connInfo={connInfo}
-            objects={objects}
-            onBack={() => setActiveTab('monitor')}
           />
         )}
 
@@ -549,8 +530,7 @@ function AppContent() {
             selectedObjects={selectedObjects}
             connInfo={connInfo}
             onNewSession={handleNewSession}
-            onBackToComparison={() => setActiveTab('compare')}
-            onDataMigration={() => setActiveTab('data')}
+            onBackToSelection={() => setActiveTab('select')}
             onCancel={handleCancelJob}
           />
         )}

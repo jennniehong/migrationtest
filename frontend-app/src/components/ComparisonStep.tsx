@@ -21,8 +21,10 @@ interface ComparisonStepProps {
   connInfo: ConnectionInfo;
   /** List of selected objects to compare / 비교할 선택된 객체 목록 */
   selectedObjects: OracleObject[];
-  /** Callback to continue to next step / 다음 단계로 진행 콜백 */
+  /** Callback to start DDL migration / DDL 마이그레이션 시작 콜백 */
   onContinue: () => void;
+  /** Callback to export data (INSERT/COPY) / 데이터 내보내기 콜백 */
+  onExportData: () => void;
   /** Callback to go back to previous step / 이전 단계로 돌아가기 콜백 */
   onBack: () => void;
 }
@@ -39,7 +41,7 @@ interface ComparisonStepProps {
  * @param props - Component props / 컴포넌트 props
  * @returns JSX element / JSX 요소
  */
-export function ComparisonStep({ connInfo, selectedObjects, onContinue, onBack }: ComparisonStepProps) {
+export function ComparisonStep({ connInfo, selectedObjects, onContinue, onExportData, onBack }: ComparisonStepProps) {
   // Currently selected object index (-1 means no selection) / 현재 선택된 객체 인덱스 (-1은 미선택)
   const [selectedObjectIndex, setSelectedObjectIndex] = useState(-1);
   // DDL comparison data / DDL 비교 데이터
@@ -144,9 +146,14 @@ export function ComparisonStep({ connInfo, selectedObjects, onContinue, onBack }
         <button className="btn-secondary" onClick={onBack}>
           ← Back to Selection
         </button>
-        <button className="btn-primary" onClick={onContinue}>
-          Start Migration →
-        </button>
+        <div className="flex gap-3">
+          <button className="btn-secondary" onClick={onExportData} title="Export table data as INSERT/COPY statements">
+            📊 Export Data
+          </button>
+          <button className="btn-primary" onClick={onContinue} title="Convert DDL schema to PostgreSQL">
+            🔄 Start DDL Migration →
+          </button>
+        </div>
       </div>
     </div>
   );
