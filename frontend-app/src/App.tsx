@@ -31,7 +31,8 @@ function AppContent() {
     sid: '',
     serviceName: '',
     useThickMode: false,
-    libDir: ''
+    libDir: '',
+    pgVersion: 15  // Default PostgreSQL version
   });
 
   const [schemas, setSchemas] = useState<string[]>([]);
@@ -255,7 +256,8 @@ function AppContent() {
       sid: '',
       serviceName: '',
       useThickMode: false,
-      libDir: ''
+      libDir: '',
+      pgVersion: 15
     });
   };
 

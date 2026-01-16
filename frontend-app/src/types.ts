@@ -22,4 +22,5 @@ export interface ConnectionInfo {
   serviceName: string;
   useThickMode: boolean;
   libDir: string;
+  pgVersion: number; // Target PostgreSQL version (11-16)
 }

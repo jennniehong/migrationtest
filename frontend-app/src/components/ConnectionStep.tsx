@@ -52,6 +52,29 @@ export const ConnectionStep: React.FC<ConnectionStepProps> = ({
 
       <div className="grid-2">
         <div className="form-group">
+          <label>Target PostgreSQL Version</label>
+          <select 
+            name="pgVersion" 
+            value={connInfo.pgVersion} 
+            onChange={(e) => setConnInfo(prev => ({ ...prev, pgVersion: parseInt(e.target.value) }))}
+            className="custom-select"
+          >
+            <option value="11">PostgreSQL 11</option>
+            <option value="12">PostgreSQL 12</option>
+            <option value="13">PostgreSQL 13</option>
+            <option value="14">PostgreSQL 14</option>
+            <option value="15">PostgreSQL 15 (Recommended)</option>
+            <option value="16">PostgreSQL 16</option>
+          </select>
+          <p className="text-xs text-muted mt-1">
+            Version for DDL conversion optimization
+          </p>
+        </div>
+        <div></div> {/* Empty cell for grid alignment */}
+      </div>
+
+      <div className="grid-2">
+        <div className="form-group">
           <label>SID (Optional)</label>
           <input name="sid" value={connInfo.sid} onChange={handleInputChange} />
         </div>

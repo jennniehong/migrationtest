@@ -45,6 +45,7 @@ class OracleConnInfo(BaseModel):
     # Advanced options
     use_thick_mode: bool = Field(False, alias="useThickMode") # For Oracle Client libraries
     lib_dir: Optional[str] = Field(None, alias="libDir")      # Path to Instant Client
+    pg_version: int = Field(15, alias="pgVersion")            # Target PostgreSQL version
 
     class Config:
         populate_by_name = True

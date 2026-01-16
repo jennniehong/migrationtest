@@ -180,6 +180,18 @@ class OracleService:
         dsn = cls.get_connection_string(info)
         schema = info.schema_name.upper()
         
+        # Map object types for DBMS_METADATA compatibility
+        # Some object types need underscores instead of spaces
+        object_type_map = {
+            'PACKAGE BODY': 'PACKAGE_BODY',
+            'TYPE BODY': 'TYPE_BODY',
+            'MATERIALIZED VIEW': 'MATERIALIZED_VIEW',
+            'DATABASE LINK': 'DB_LINK'
+        }
+        
+        # Get the correct object type for Oracle
+        oracle_object_type = object_type_map.get(object_type.upper(), object_type.upper())
+        
         try:
             with oracledb.connect(user=info.user, password=info.password, dsn=dsn) as conn:
                 with conn.cursor() as cursor:
@@ -194,7 +206,7 @@ class OracleService:
                         FROM DUAL
                     """
                     cursor.execute(ddl_query, 
-                                   object_type=object_type.upper(), 
+                                   object_type=oracle_object_type, 
                                    object_name=object_name.upper(), 
                                    schema_name=schema)
                     result = cursor.fetchone()

@@ -269,6 +269,31 @@ async def convert_ddl(request: DDLRequest, background_tasks: BackgroundTasks):
         print(f"[DDL Conversion] Starting conversion for {request.object_type}: {request.object_name}")
         print(f"[DDL Conversion] Working directory: {job_dir}")
         
+        # Check if object type is supported by ora2pg
+        # INDEX, CONSTRAINT, and some other types are not directly convertible
+        unsupported_types = {
+            'INDEX': 'Indexes are automatically included when converting their parent TABLE.',
+            'CONSTRAINT': 'Constraints are automatically included when converting their parent TABLE.',
+            'TRIGGER': 'Note: Trigger syntax may require manual adjustment for PostgreSQL.'
+        }
+        
+        if request.object_type.upper() in unsupported_types:
+            # Get source DDL but provide info message for conversion
+            source_ddl = OracleService.get_ddl(
+                request.connection,
+                request.object_type,
+                request.object_name
+            )
+            info_message = unsupported_types[request.object_type.upper()]
+            converted_ddl = f"-- {info_message}\n-- Oracle Source DDL is shown in the comparison view.\n-- For INDEX objects, convert the parent TABLE to get all associated indexes."
+            
+            return DDLComparison(
+                object_name=request.object_name,
+                object_type=request.object_type,
+                source_ddl=source_ddl,
+                converted_ddl=converted_ddl
+            )
+        
         # Create a minimal ora2pg.conf for single object
         config_path = os.path.join(job_dir, "ora2pg.conf")
         with open(config_path, "w") as f:
@@ -281,6 +306,7 @@ async def convert_ddl(request: DDLRequest, background_tasks: BackgroundTasks):
             f.write(f"ALLOW {request.object_name}\n")
             f.write(f"OUTPUT {job_id}_converted.sql\n")
             f.write(f"OUTPUT_DIR /data\n")  # Docker internal path
+            f.write(f"PG_VERSION {request.connection.pg_version}\n")  # User-selected PostgreSQL version
         
         print(f"[DDL Conversion] ora2pg.conf created")
         
