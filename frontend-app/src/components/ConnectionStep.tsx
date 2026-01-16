@@ -1,15 +1,44 @@
+/**
+ * @fileoverview Database Connection Step Component
+ * Provides a form for configuring Oracle database connection settings.
+ * 
+ * 데이터베이스 연결 단계 컴포넌트
+ * Oracle 데이터베이스 연결 설정을 구성하는 양식을 제공합니다.
+ */
 import React from 'react';
 import { ConnectionInfo } from '../types';
 
+/**
+ * Props for the ConnectionStep component.
+ * ConnectionStep 컴포넌트의 Props입니다.
+ */
 interface ConnectionStepProps {
+  /** Current connection info state / 현재 연결 정보 상태 */
   connInfo: ConnectionInfo;
+  /** State setter for connection info / 연결 정보 상태 설정자 */
   setConnInfo: React.Dispatch<React.SetStateAction<ConnectionInfo>>;
+  /** Available schemas from database / 데이터베이스에서 사용 가능한 스키마 목록 */
   schemas: string[];
+  /** Loading state indicator / 로딩 상태 표시 */
   loading: boolean;
+  /** Callback to test connection / 연결 테스트 콜백 */
   onTestConnection: () => void;
+  /** Callback to fetch objects after connection / 연결 후 객체 조회 콜백 */
   onFetchObjects: () => void;
 }
 
+/**
+ * Database Connection Step Component
+ * Renders a form with input fields for Oracle database connection configuration.
+ * Supports both SID and Service Name connection methods.
+ * 
+ * 데이터베이스 연결 단계 컴포넌트
+ * Oracle 데이터베이스 연결 구성을 위한 입력 필드가 있는 양식을 렌더링합니다.
+ * SID 및 서비스 이름 연결 방식을 모두 지원합니다.
+ * 
+ * @param props - Component props / 컴포넌트 props
+ * @returns JSX element / JSX 요소
+ */
 export const ConnectionStep: React.FC<ConnectionStepProps> = ({
   connInfo,
   setConnInfo,
@@ -18,6 +47,12 @@ export const ConnectionStep: React.FC<ConnectionStepProps> = ({
   onTestConnection,
   onFetchObjects
 }) => {
+  /**
+   * Handle input field changes and update connection info state.
+   * 입력 필드 변경을 처리하고 연결 정보 상태를 업데이트합니다.
+   * 
+   * @param e - Change event from input element / 입력 요소의 변경 이벤트
+   */
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     setConnInfo(prev => ({ 

@@ -1,14 +1,40 @@
+/**
+ * @fileoverview Sidebar Navigation Component
+ * Displays recent job sessions and provides navigation controls.
+ * 
+ * 사이드바 네비게이션 컴포넌트
+ * 최근 작업 세션을 표시하고 탐색 컨트롤을 제공합니다.
+ */
 import React from 'react';
 import { JobProgress } from '../types';
 
+/**
+ * Props for the Sidebar component.
+ * Sidebar 컴포넌트의 Props입니다.
+ */
 interface SidebarProps {
+  /** List of job history / 작업 이력 목록 */
   history: JobProgress[];
+  /** Currently selected job ID / 현재 선택된 작업 ID */
   jobId: string | null;
+  /** Callback when a job is selected / 작업 선택 시 콜백 */
   onSelectJob: (id: string) => void;
+  /** Callback when a job is deleted / 작업 삭제 시 콜백 */
   onDeleteJob: (id: string, e: React.MouseEvent) => void;
+  /** Callback to start new session / 새 세션 시작 콜백 */
   onNewSession: () => void;
 }
 
+/**
+ * Sidebar Navigation Component
+ * Displays application branding, new migration button, and recent session history.
+ * 
+ * 사이드바 네비게이션 컴포넌트
+ * 애플리케이션 브랜딩, 새 마이그레이션 버튼 및 최근 세션 이력을 표시합니다.
+ * 
+ * @param props - Component props / 컴포넌트 props
+ * @returns JSX element / JSX 요소
+ */
 export const Sidebar: React.FC<SidebarProps> = ({
   history,
   jobId,

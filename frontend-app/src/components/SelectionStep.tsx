@@ -1,26 +1,64 @@
+/**
+ * @fileoverview Object Selection Step Component
+ * Provides an interface for selecting Oracle objects to migrate with filtering and preview.
+ * 
+ * 객체 선택 단계 컴포넌트
+ * 필터링 및 미리보기 기능을 갖춘 마이그레이션할 Oracle 객체 선택 인터페이스를 제공합니다.
+ */
 import React, { useState } from 'react';
 import { OracleObject, ConnectionInfo, DDLComparison } from '../types';
 import { DDLCompareView } from './DDLCompareView';
 
+/** API base URL / API 기본 URL */
 const API_BASE = "http://localhost:8080/api";
 
+/**
+ * Props for the SelectionStep component.
+ * SelectionStep 컴포넌트의 Props입니다.
+ */
 interface SelectionStepProps {
+  /** Search term for filtering objects / 객체 필터링용 검색어 */
   searchTerm: string;
+  /** Callback to update search term / 검색어 업데이트 콜백 */
   setSearchTerm: (term: string) => void;
+  /** Set of object types to filter by / 필터링할 객체 타입 집합 */
   filterTypes: Set<string>;
+  /** Callback to update filter types / 필터 타입 업데이트 콜백 */
   setFilterTypes: React.Dispatch<React.SetStateAction<Set<string>>>;
+  /** Output format preference / 출력 형식 선호도 */
   outputFormat: string;
+  /** Callback to update output format / 출력 형식 업데이트 콜백 */
   setOutputFormat: (format: string) => void;
+  /** Currently selected objects / 현재 선택된 객체들 */
   selectedObjects: OracleObject[];
+  /** Callback to update selected objects / 선택된 객체 업데이트 콜백 */
   setSelectedObjects: React.Dispatch<React.SetStateAction<OracleObject[]>>;
+  /** List of unique object types available / 사용 가능한 고유 객체 타입 목록 */
   uniqueTypes: string[];
+  /** Filtered list of objects based on search/filter / 검색/필터 기반 필터링된 객체 목록 */
   filteredObjects: OracleObject[];
+  /** Oracle connection info for DDL preview / DDL 미리보기용 Oracle 연결 정보 */
   connInfo: ConnectionInfo;
+  /** Loading state indicator / 로딩 상태 표시 */
   loading: boolean;
+  /** Callback to start the job / 작업 시작 콜백 */
   onStartJob: () => void;
+  /** Callback to go back to previous step / 이전 단계로 돌아가기 콜백 */
   onBack: () => void;
 }
 
+/**
+ * Object Selection Step Component
+ * Displays a filterable list of Oracle objects with multi-select capability.
+ * Includes inline DDL preview functionality and type-based filtering.
+ * 
+ * 객체 선택 단계 컴포넌트
+ * 다중 선택 기능이 있는 필터 가능한 Oracle 객체 목록을 표시합니다.
+ * 인라인 DDL 미리보기 기능과 타입 기반 필터링을 포함합니다.
+ * 
+ * @param props - Component props / 컴포넌트 props
+ * @returns JSX element / JSX 요소
+ */
 export const SelectionStep: React.FC<SelectionStepProps> = ({
   searchTerm,
   setSearchTerm,
@@ -37,11 +75,19 @@ export const SelectionStep: React.FC<SelectionStepProps> = ({
   onStartJob,
   onBack
 }) => {
+  // Dropdown state for type filter / 타입 필터 드롭다운 상태
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
+  // Set of expanded rows showing DDL preview / DDL 미리보기를 표시하는 확장된 행 집합
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  // Cache for DDL comparison data / DDL 비교 데이터 캐시
   const [ddlCache, setDdlCache] = useState<Record<string, DDLComparison>>({});
+  // Set of objects currently loading DDL / 현재 DDL을 로딩 중인 객체 집합
   const [loadingDDL, setLoadingDDL] = useState<Set<string>>(new Set());
 
+  /**
+   * Check if an object is currently selected.
+   * 객체가 현재 선택되어 있는지 확인합니다.
+   */
   const isSelected = (obj: OracleObject) => selectedObjects.some(s => s.name === obj.name && s.type === obj.type);
 
   const togglePreview = async (obj: OracleObject) => {

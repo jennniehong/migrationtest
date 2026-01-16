@@ -1,24 +1,58 @@
+/**
+ * @fileoverview Data Export Step Component
+ * Allows users to select tables and export data as PostgreSQL COPY format files.
+ * 
+ * 데이터 내보내기 단계 컴포넌트
+ * 사용자가 테이블을 선택하고 PostgreSQL COPY 형식 파일로 데이터를 내보낼 수 있습니다.
+ */
 import React, { useState } from 'react';
 import { ConnectionInfo, OracleObject } from '../types';
 
 const API_BASE = "http://localhost:8080/api";
 
+/**
+ * Props for the DataMigrationStep component.
+ * DataMigrationStep 컴포넌트의 Props입니다.
+ */
 interface DataMigrationStepProps {
+  /** Oracle connection information / Oracle 연결 정보 */
   connInfo: ConnectionInfo;
+  /** List of available Oracle objects / 사용 가능한 Oracle 객체 목록 */
   objects: OracleObject[];
+  /** Callback to navigate back / 뒤로 가기 콜백 */
   onBack: () => void;
 }
 
+/**
+ * Data Export Step Component
+ * Displays a table selection interface for exporting Oracle data as PostgreSQL COPY format.
+ * 
+ * 데이터 내보내기 단계 컴포넌트
+ * Oracle 데이터를 PostgreSQL COPY 형식으로 내보내기 위한 테이블 선택 인터페이스를 표시합니다.
+ * 
+ * @param props - Component props / 컴포넌트 props
+ * @returns JSX element / JSX 요소
+ */
 export function DataMigrationStep({ connInfo, objects, onBack }: DataMigrationStepProps) {
+  // Selected table names for export / 내보내기용 선택된 테이블 이름들
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
+  // Batch size for data processing / 데이터 처리 배치 크기
   const [batchSize, setBatchSize] = useState(1000);
+  // Job ID after export starts / 내보내기 시작 후 작업 ID
   const [jobId, setJobId] = useState<string | null>(null);
+  // Loading state / 로딩 상태
   const [loading, setLoading] = useState(false);
+  // Error message / 오류 메시지
   const [error, setError] = useState<string | null>(null);
 
-  // Filter only TABLE type objects
+  // Filter only TABLE type objects / TABLE 타입 객체만 필터링
   const tables = objects.filter(obj => obj.type === 'TABLE');
 
+  /**
+   * Toggle selection state of a table.
+   * 테이블의 선택 상태를 토글합니다.
+   * @param tableName - Name of the table to toggle / 토글할 테이블 이름
+   */
   const toggleTable = (tableName: string) => {
     setSelectedTables(prev => 
       prev.includes(tableName) 
@@ -27,6 +61,10 @@ export function DataMigrationStep({ connInfo, objects, onBack }: DataMigrationSt
     );
   };
 
+  /**
+   * Toggle selection of all tables.
+   * 모든 테이블의 선택을 토글합니다.
+   */
   const toggleAll = () => {
     if (selectedTables.length === tables.length) {
       setSelectedTables([]);
@@ -35,6 +73,13 @@ export function DataMigrationStep({ connInfo, objects, onBack }: DataMigrationSt
     }
   };
 
+  /**
+   * Start the data export job.
+   * Calls the API to begin extracting data from selected tables.
+   * 
+   * 데이터 내보내기 작업을 시작합니다.
+   * 선택한 테이블에서 데이터 추출을 시작하는 API를 호출합니다.
+   */
   const startDataMigration = async () => {
     if (selectedTables.length === 0) {
       setError('Please select at least one table');
@@ -72,9 +117,9 @@ export function DataMigrationStep({ connInfo, objects, onBack }: DataMigrationSt
     <div className="step-container">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h3 className="text-xl font-bold m-0">Data Migration</h3>
+          <h3 className="text-xl font-bold m-0">Data Export</h3>
           <p className="text-sm text-muted mt-1">
-            Select tables to migrate data from Oracle to PostgreSQL
+            Extract table data as PostgreSQL COPY format files for manual import
           </p>
         </div>
         <button className="btn-secondary" onClick={onBack}>
@@ -154,7 +199,7 @@ export function DataMigrationStep({ connInfo, objects, onBack }: DataMigrationSt
                 onClick={startDataMigration}
                 disabled={loading || selectedTables.length === 0}
               >
-                {loading ? 'Starting...' : `Start Data Migration (${selectedTables.length} tables)`}
+                {loading ? 'Starting...' : `Export Data (${selectedTables.length} tables)`}
               </button>
             </div>
           </div>
@@ -162,10 +207,10 @@ export function DataMigrationStep({ connInfo, objects, onBack }: DataMigrationSt
       ) : (
         <div className="card p-6 text-center">
           <div className="step-circle active mb-4">✓</div>
-          <h4 className="mb-2">Data Migration Started</h4>
+          <h4 className="mb-2">Data Export Started</h4>
           <p className="text-muted mb-4">Job ID: {jobId}</p>
           <p className="text-sm">
-            Your data migration job has been started. You can monitor progress in the sidebar's job history.
+            Data export job started. Once completed, download the ZIP file and use PostgreSQL's COPY command to import.
           </p>
         </div>
       )}

@@ -1,26 +1,59 @@
+/**
+ * @fileoverview Migration Monitor Step Component
+ * Displays real-time job progress, logs, and object status during migration.
+ * 
+ * 마이그레이션 모니터 단계 컴포넌트
+ * 마이그레이션 중 실시간 작업 진행 상황, 로그 및 객체 상태를 표시합니다.
+ */
 import React, { useEffect, useRef } from 'react';
 import { ConnectionInfo, JobProgress, OracleObject } from '../types';
 
-// Assuming API_BASE is shared constant, but components shouldn't rely on it for download link if possible.
-// We'll accept download URL generation or base as prop, or keep hardcoded if it was constant. 
-// Ideally passed as prop, but 'API_BASE' was a constant in App.tsx. We'll reuse the string literal for simplicity or move it to constants.
+/** API base URL / API 기본 URL */
 const API_BASE = "http://localhost:8080/api";
 
+/**
+ * Props for the MonitorStep component.
+ * MonitorStep 컴포넌트의 Props입니다.
+ */
 interface MonitorStepProps {
+  /** Current job ID / 현재 작업 ID */
   jobId: string;
+  /** Job progress and status / 작업 진행 상태 */
   jobStatus: JobProgress | null;
+  /** Elapsed time in seconds / 경과 시간 (초) */
   elapsed: number;
+  /** Array of log messages / 로그 메시지 배열 */
   logs: string[];
+  /** Active tab in monitor view ('overview' or 'logs') / 모니터 뷰의 활성 탭 */
   activeTabMonitor: string;
+  /** Callback to change active tab / 활성 탭 변경 콜백 */
   setActiveTabMonitor: (tab: string) => void;
+  /** List of selected objects being processed / 처리 중인 선택된 객체 목록 */
   selectedObjects: OracleObject[];
+  /** Oracle connection info / Oracle 연결 정보 */
   connInfo: ConnectionInfo;
+  /** Callback to start a new session / 새 세션 시작 콜백 */
   onNewSession: () => void;
+  /** Callback to go back to comparison view / 비교 뷰로 돌아가기 콜백 */
   onBackToComparison: () => void;
+  /** Optional callback for data export / 데이터 내보내기용 선택적 콜백 */
   onDataMigration?: () => void;
+  /** Optional callback to cancel running job / 실행 중인 작업 취소용 선택적 콜백 */
   onCancel?: () => void;
 }
 
+/**
+ * Migration Monitor Step Component
+ * Provides real-time monitoring of migration jobs with progress tracking,
+ * log viewing, and action buttons for job control.
+ * 
+ * 마이그레이션 모니터 단계 컴포넌트
+ * 진행 상황 추적, 로그 보기, 작업 제어 버튼을 통한
+ * 마이그레이션 작업의 실시간 모니터링을 제공합니다.
+ * 
+ * @param props - Component props / 컴포넌트 props
+ * @returns JSX element / JSX 요소
+ */
 export const MonitorStep: React.FC<MonitorStepProps> = ({
   jobId,
   jobStatus,
@@ -35,8 +68,13 @@ export const MonitorStep: React.FC<MonitorStepProps> = ({
   onDataMigration,
   onCancel
 }) => {
+  // Ref for auto-scrolling log container / 로그 컨테이너 자동 스크롤용 Ref
   const logContainerRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * Auto-scroll log container to bottom when new logs arrive.
+   * 새 로그가 도착하면 로그 컨테이너를 자동으로 맨 아래로 스크롤합니다.
+   */
   useEffect(() => {
     if (logContainerRef.current && activeTabMonitor === 'logs') {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
@@ -229,10 +267,32 @@ export const MonitorStep: React.FC<MonitorStepProps> = ({
               </a>
               {onDataMigration && (
                 <button className="btn-primary" onClick={onDataMigration}>
-                  Migrate Data →
+                  Export Data →
                 </button>
               )}
             </>
+          )}
+          {jobStatus?.status === 'PARTIAL_DONE' && jobStatus?.failed_objects && jobStatus.failed_objects.length > 0 && (
+            <button 
+              className="btn-secondary"
+              style={{ borderColor: 'var(--warning)', color: 'var(--warning)' }}
+              onClick={async () => {
+                try {
+                  const res = await fetch(`${API_BASE}/jobs/${jobId}/retry`, { method: 'POST' });
+                  if (res.ok) {
+                    const data = await res.json();
+                    alert(`Retry initiated for ${data.retry_objects?.length || 0} objects. Refresh to see progress.`);
+                  } else {
+                    const err = await res.json();
+                    alert(`Retry failed: ${err.detail || 'Unknown error'}`);
+                  }
+                } catch (e) {
+                  alert('Error initiating retry');
+                }
+              }}
+            >
+              🔄 Retry Failed ({jobStatus.failed_objects.length})
+            </button>
           )}
         </div>
       </div>
