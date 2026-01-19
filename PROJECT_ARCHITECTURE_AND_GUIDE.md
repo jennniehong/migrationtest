@@ -16,22 +16,32 @@ Allows database administrators and developers to perform Oracle to PostgreSQL mi
 
 
 ### 1.2 User Workflow
-The application follows a linear wizard-style process:
+The application follows a streamlined 3-step process:
 
 1.  **Connection Setup**: User inputs Oracle database credentials (Host, Port, SID/Service, User, Password).
     
     ![Connection Setup](docs/images/connection_setup.png)
 
-2.  **Discovery**: System connects to Oracle to retrieve available schemas and objects (Tables, Views, Functions, etc.).
-3.  **Selection**: User filters objects by Type (Multi-select) or Name (Search) and selects objects to migrate.
+2.  **Object Selection**: 
+    - User filters objects by Type (Multi-select) or Name (Search) and selects objects to migrate.
+    - **DDL Download**: Click "📥 Download DDL" to start schema conversion.
+    - **Data Export**: Click "📊 Prepare Data Export" to expand data export configuration.
 
     ![Object Selection](docs/images/object_selection.png)
 
-4.  **Execution**: System spawns a background job to run `ora2pg` for selected objects.
+    **Data Export Configuration**:
+    - Configure batch size and output format (SQL/CSV)
+    - Select tables for data export
+    - Start data export job
+
+    ![Data Export Configuration](docs/images/data_export_config.png)
+
+3.  **Monitoring**: 
+    - Real-time progress tracking and log viewing
+    - Download results as ZIP when complete
+    - Retry failed objects if needed
 
     ![Migration Progress](docs/images/migration_progress.png)
-
-5.  **Delivery**: User monitors progress in real-time and downloads the generated SQL/Data files as a ZIP package.
 
 ---
 
@@ -131,10 +141,41 @@ graph TD
 -   **Docker Desktop**: Must be running (to execute `ora2pg` containers).
 -   **Python 3.9+**: For the backend API.
 -   **Node.js 16+**: For the frontend.
+-   **Oracle Instant Client** (Optional): Required only if using Thick mode.
+    -   **Download**: Get the appropriate version for your OS from [Oracle Instant Client Downloads](https://www.oracle.com/database/technologies/instant-client/downloads.html).
+    -   **Installation**: Extract the downloaded ZIP file to your preferred location.
+    -   **Path Examples** (use the full path to the `instantclient_19_xx` folder after extraction):
+        -   **Windows**: `C:\oracle\instantclient_win\instantclient-basic-windows.x64-19.29.0.0.0dbru\instantclient_19_29`
+        -   **Linux**: `/opt/oracle/instantclient_19_21` or `/usr/lib/oracle/19.21/client64/lib`
+        -   **macOS**: `/usr/local/lib/instantclient_19_21`
+    -   **Required Files** (must exist in the above path):
+        -   Windows: `oci.dll`
+        -   Linux: `libclntsh.so`
+        -   macOS: `libclntsh.dylib`
 
 ### 4.2 Setup & Running
 
-**Step 1: Build Docker Image**
+**Step 1: Oracle Instant Client Setup (For Thick Mode)**
+If you plan to use Thick mode, install Oracle Instant Client and verify the path.
+
+```bash
+# Windows example - use the full path to the extracted instantclient_19_xx folder
+dir C:\oracle\instantclient_win\instantclient-basic-windows.x64-19.29.0.0.0dbru\instantclient_19_29\oci.dll
+
+# Linux example
+ls /opt/oracle/instantclient_19_21/libclntsh.so
+
+# macOS example
+ls /usr/local/lib/instantclient_19_21/libclntsh.dylib
+```
+
+> [!TIP]
+> In the application's connection setup screen, when you check "Use Thick Mode", a library path input field will appear. Enter the **full path** to the `instantclient_19_xx` folder verified above.
+
+> [!NOTE]
+> Thick mode is optional. The default Thin mode is sufficient for most use cases. Use Thick mode only if you need specific Oracle features (e.g., Advanced Queuing, LDAP authentication).
+
+**Step 2: Build Docker Image**
 Needed for the actual migration runner.
 ```bash
 cd infra
@@ -142,14 +183,14 @@ docker build -t ora2pg-runner -f ora2pg.Dockerfile .
 docker images ora2pg-runner
 ```
 
-**Step 2: Start Backend**
+**Step 3: Start Backend**
 ```bash
 cd backend
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-**Step 3: Start Frontend**
+**Step 4: Start Frontend**
 ```bash
 cd frontend-app
 npm install

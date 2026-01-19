@@ -16,22 +16,32 @@
 
 
 ### 1.2 사용자 워크플로우
-애플리케이션은 선형적인 마법사(Wizard) 방식을 따릅니다:
+애플리케이션은 선형적인 3단계 워크플로우를 따릅니다:
 
 1.  **연결 설정 (Connection Setup)**: 사용자가 Oracle 데이터베이스 자격 증명(Host, Port, SID/Service, User, Password)을 입력합니다.
     
     ![Connection Setup](docs/images/connection_setup.png)
 
-2.  **검색 (Discovery)**: 시스템이 Oracle에 연결하여 사용 가능한 스키마와 객체(테이블, 뷰, 함수 등)를 검색합니다.
-3.  **선택 (Selection)**: 사용자가 유형별 필터링(다중 선택) 또는 이름 검색을 통해 마이그레이션할 객체를 선택합니다.
+2.  **객체 선택 (Selection)**: 
+    - 사용자가 유형별 필터링(다중 선택) 또는 이름 검색을 통해 마이그레이션할 객체를 선택합니다.
+    - **DDL 다운로드**: "📥 Download DDL" 버튼을 클릭하여 스키마 변환 작업을 시작합니다.
+    - **데이터 내보내기**: "📊 Prepare Data Export" 버튼을 클릭하여 데이터 내보내기 설정을 펼칩니다.
 
     ![Object Selection](docs/images/object_selection.png)
 
-4.  **실행 (Execution)**: 시스템이 선택된 객체에 대해 `ora2pg`를 실행하는 백그라운드 작업을 생성합니다.
+    **데이터 내보내기 구성**:
+    - 배치 크기 및 출력 형식(SQL/CSV) 설정
+    - 내보낼 테이블 선택
+    - 데이터 내보내기 작업 시작
+
+    ![Data Export Configuration](docs/images/data_export_config.png)
+
+3.  **모니터링 (Monitor)**: 
+    - 실시간 진행 상황 추적 및 로그 확인
+    - 완료 시 결과 ZIP 파일 다운로드
+    - 실패한 객체 재시도 옵션
     
     ![Migration Progress](docs/images/migration_progress.png)
-
-5.  **제공 (Delivery)**: 사용자는 진행 상황을 실시간으로 모니터링하고 생성된 SQL/데이터 파일을 ZIP 패키지로 다운로드합니다.
 
 ---
 
@@ -131,24 +141,55 @@ graph TD
 -   **Docker Desktop**: 실행 중이어야 합니다 (`ora2pg` 컨테이너 실행용).
 -   **Python 3.9+**: 백엔드 API 실행용.
 -   **Node.js 16+**: 프론트엔드 실행용.
+-   **Oracle Instant Client** (선택사항): Thick 모드를 사용하는 경우 필요합니다.
+    -   **다운로드**: [Oracle Instant Client 다운로드 페이지](https://www.oracle.com/database/technologies/instant-client/downloads.html)에서 운영체제에 맞는 버전을 다운로드합니다.
+    -   **설치 방법**: 다운로드한 ZIP 파일을 원하는 위치에 압축 해제합니다.
+    -   **경로 예시** (압축 해제 후 `instantclient_19_xx` 폴더까지의 전체 경로를 사용):
+        -   **Windows**: `C:\oracle\instantclient_win\instantclient-basic-windows.x64-19.29.0.0.0dbru\instantclient_19_29`
+        -   **Linux**: `/opt/oracle/instantclient_19_21` 또는 `/usr/lib/oracle/19.21/client64/lib`
+        -   **macOS**: `/usr/local/lib/instantclient_19_21`
+    -   **필수 파일 확인** (위 경로 내에 다음 파일이 있어야 함):
+        -   Windows: `oci.dll`
+        -   Linux: `libclntsh.so`
+        -   macOS: `libclntsh.dylib`
 
 ### 4.2 설정 및 실행
 
-**1단계: Docker 이미지 빌드**
+**1단계: Oracle Instant Client 설정 (Thick 모드 사용 시)**
+Thick 모드를 사용하려는 경우, Oracle Instant Client를 설치하고 경로를 확인합니다.
+
+```bash
+# Windows 예시 - 압축 해제한 instantclient_19_xx 폴더의 전체 경로 사용
+dir C:\oracle\instantclient_win\instantclient-basic-windows.x64-19.29.0.0.0dbru\instantclient_19_29\oci.dll
+
+# Linux 예시
+ls /opt/oracle/instantclient_19_21/libclntsh.so
+
+# macOS 예시
+ls /usr/local/lib/instantclient_19_21/libclntsh.dylib
+```
+
+> [!TIP]
+> 애플리케이션의 연결 설정 화면에서 "Use Thick Mode" 체크박스를 선택하면, 라이브러리 경로 입력 필드가 나타납니다. 위에서 확인한 `instantclient_19_xx` 폴더의 **전체 경로**를 입력하세요.
+
+> [!NOTE]
+> Thick 모드는 선택사항입니다. 대부분의 경우 기본 Thin 모드로 충분합니다. Thick 모드는 특정 Oracle 기능(예: Advanced Queuing, LDAP 인증)이 필요한 경우에만 사용하세요.
+
+**2단계: Docker 이미지 빌드**
 실제 마이그레이션 러너를 위해 필요합니다.
 ```bash
 cd infra
 docker build -t ora2pg-runner -f ora2pg.Dockerfile .
 ```
 
-**2단계: 백엔드 시작**
+**3단계: 백엔드 시작**
 ```bash
 cd backend
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-**3단계: 프론트엔드 시작**
+**4단계: 프론트엔드 시작**
 ```bash
 cd frontend-app
 npm install
