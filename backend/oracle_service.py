@@ -84,11 +84,14 @@ class OracleService:
         """
         cls.initialize_client(info)
         dsn = cls.get_connection_string(info)
+        print(f"DEBUG: Testing connection with DSN: {dsn}, User: {info.user}")
         try:
             # Set a timeout (e.g., 10 seconds) to avoid indefinite hanging
             with oracledb.connect(user=info.user, password=info.password, dsn=dsn, tcp_connect_timeout=10) as conn:
+                print("DEBUG: Connection successful")
                 return True
         except Exception as e:
+            print(f"DEBUG: Connection failed: {str(e)}")
             raise Exception(f"Failed to connect to Oracle: {str(e)}")
 
     @classmethod

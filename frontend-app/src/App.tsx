@@ -8,7 +8,7 @@ import { MonitorStep } from './components/MonitorStep';
 import { ComparisonStep } from './components/ComparisonStep';
 import { ConnectionInfo, JobProgress, OracleObject } from './types';
 
-const API_BASE = "http://localhost:8080/api";
+const API_BASE = "/api";
 
 function AppContent() {
   const { showToast } = useToast();
