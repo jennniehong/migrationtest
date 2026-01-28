@@ -197,6 +197,41 @@ npm run dev
 ```
 브라우저에서 `http://localhost:5173`으로 접속합니다.
 
+### 4.3 프로덕션 배포 (운영 서버)
+
+운영 서버에서는 Docker Compose를 사용하여 애플리케이션을 배포할 수 있습니다.
+
+#### 전체 배포 프로세스
+
+**1단계: Docker 및 Docker Compose 설치**
+```bash
+# Docker 설치
+sudo yum install -y yum-utils
+sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+sudo yum install -y docker-ce docker-ce-cli containerd.io
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Docker Compose 설치
+sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+```
+
+**2단계: Ora2Pg 이미지 빌드**
+```bash
+cd infra
+docker build -t ora2pg-runner -f ora2pg.Dockerfile .
+```
+
+**3단계: 애플리케이션 실행**
+```bash
+cd ..
+docker-compose up -d
+```
+
+> [!IMPORTANT]
+> 자세한 배포 가이드는 [DEPLOYMENT_GUIDE_KR.md](DEPLOYMENT_GUIDE_KR.md)를 참조하세요. PostgreSQL 14+ 설치 방법도 포함되어 있습니다.
+
 ---
 
 ## 5. 보안 및 확장성

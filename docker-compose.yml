@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # Backend FastAPI service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: migration-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount Docker socket to allow backend to spawn ora2pg containers
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Persist work directory for job outputs
+      - ./backend/work:/app/work
+    networks:
+      - migration-network
+    restart: unless-stopped
+
+  # Frontend Nginx service
+  frontend:
+    build:
+      context: ./frontend-app
+      dockerfile: Dockerfile
+    container_name: migration-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - migration-network
+    restart: unless-stopped
+
+  # Optional: PostgreSQL 14 database
+  # Uncomment if you want to run PostgreSQL in Docker
+  # postgres:
+  #   image: postgres:14
+  #   container_name: migration-postgres
+  #   environment:
+  #     POSTGRES_USER: migration_user
+  #     POSTGRES_PASSWORD: secure_password
+  #     POSTGRES_DB: migration_db
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   networks:
+  #     - migration-network
+  #   restart: unless-stopped
+
+networks:
+  migration-network:
+    driver: bridge
+
+volumes:
+  # Uncomment if using PostgreSQL service
+  # postgres_data:

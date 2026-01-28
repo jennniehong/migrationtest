@@ -79,3 +79,6 @@ Job data is stored in `backend/work/{jobId}` and can be manually cleared.
 For detailed architecture and technical guide, see:
 - [PROJECT_ARCHITECTURE_AND_GUIDE.md](PROJECT_ARCHITECTURE_AND_GUIDE.md) (English)
 - [PROJECT_ARCHITECTURE_AND_GUIDE_KR.md](PROJECT_ARCHITECTURE_AND_GUIDE_KR.md) (Korean)
+
+For production deployment instructions, see:
+- [DEPLOYMENT_GUIDE_KR.md](DEPLOYMENT_GUIDE_KR.md) (Korean)
